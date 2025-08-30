@@ -1,0 +1,22 @@
+{
+  "name": "drivekind-api",
+  "version": "1.0.0",
+  "description": "Simple API with users endpoint",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "@supabase/supabase-js": "^2.52.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
