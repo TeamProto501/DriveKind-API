@@ -29,15 +29,32 @@ npm run dev
 
 ## API Endpoints
 
-- `GET /` - API info
-- `GET /users` - Get all users from the Supabase users table
+- `GET /` - API info (public)
+- `GET /users` - Get all users from the Supabase users table (requires JWT authentication)
 
-## Database
+## Authentication
 
-This API connects to Supabase and expects a `users` table with the following structure:
+This API uses JWT authentication with Supabase. Protected endpoints require:
+1. `Authorization: Bearer <jwt_token>` header
+2. Valid user profile in the `profiles` table
+3. User must be assigned to an organization
+
+## Database Schema
+
+This API expects the following Supabase tables:
+
+**users table:**
 - `id` (primary key)
 - `name` (text)
-- `email` (text)
+- `email` (text)  
 - `created_at` (timestamp)
+
+**profiles table:**
+- `auth_user_id` (references Supabase auth users)
+- `org_id` (organization ID)
+- `first_name` (text)
+- `last_name` (text)
+
+The API uses Row Level Security (RLS) with user tokens for data access control.
 
 The server runs on port 3000 by default.
