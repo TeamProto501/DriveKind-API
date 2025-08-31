@@ -5,7 +5,7 @@ const cors = require('cors');
 const db = require('./database');
 const { createServerClient } = require('@supabase/ssr');
 const app = express();
-
+ 
 // Initialize single Supabase client instance
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
