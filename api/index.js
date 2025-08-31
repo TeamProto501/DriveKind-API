@@ -6,8 +6,6 @@ const db = require('./database');
 const { createServerClient } = require('@supabase/ssr');
 const app = express();
 
-const PORT = process.env.PORT || 3000;
-
 // Initialize single Supabase client instance
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
@@ -103,8 +101,5 @@ app.get('/users', validateJWTWithOrg, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`DriveKind API server running on port ${PORT}`);
-});
-
+// Export the Express app as a serverless function
 module.exports = app;

@@ -1,6 +1,6 @@
 # DriveKind API
 
-Simple Express API with a users endpoint.
+Simple Express API with a users endpoint, built for Vercel serverless deployment.
 
 ## Setup
 
@@ -17,14 +17,16 @@ Edit `.env` and add your Supabase credentials:
 - `SUPABASE_URL` - Your Supabase project URL
 - `SUPABASE_KEY` - Your Supabase anonymous key
 
-3. Start the server:
-```bash
-npm start
-```
-
-For development with auto-reload:
+3. For local development:
 ```bash
 npm run dev
+# or
+vercel dev
+```
+
+4. For deployment to Vercel:
+```bash
+vercel --prod
 ```
 
 ## API Endpoints
@@ -57,4 +59,17 @@ This API expects the following Supabase tables:
 
 The API uses Row Level Security (RLS) with user tokens for data access control.
 
-The server runs on port 3000 by default.
+## Project Structure
+
+```
+DriveKind-API/
+├── api/
+│   ├── index.js          # Main serverless function
+│   └── database.js       # Database operations
+├── vercel.json           # Vercel configuration
+├── package.json          # Dependencies and scripts
+├── .env.example          # Environment variables template
+└── README.md
+```
+
+This structure follows Vercel's serverless function conventions where files in `/api` become serverless endpoints.
