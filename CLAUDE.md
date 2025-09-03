@@ -1,9 +1,8 @@
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
+   
 ## Development Commands
-
 - **Start development server**: `npm start` - Runs the Express.js server on port 3000
 - **Local development**: `vercel dev` - Runs with Vercel CLI for testing deployment environment
 - **Tests**: No test framework currently configured (package.json shows placeholder test script)
