@@ -123,6 +123,68 @@ const validateJWTWithOrg = [validateJWT, validateOrgAccess];
 
 
 
+// Client routes
+app.post('/clients', validateJWTWithOrg, async (req, res) => {
+  try {
+    const clientData = {
+      ...req.body,
+      org_id: req.user.org_id,
+      user_id: req.user.id
+    };
+    const client = await db.createClient(clientData, req.userToken);
+    res.status(201).json(client);
+  } catch (error) {
+    console.error('Error creating client:', error);
+    res.status(500).json({ error: 'Failed to create client' });
+  }
+});
+
+app.get('/clients', validateJWT, async (req, res) => {
+  try {
+    const clients = await db.getAllClients(req.userToken);
+    res.json(clients);
+  } catch (error) {
+    console.error('Error fetching clients:', error);
+    res.status(500).json({ error: 'Failed to fetch clients' });
+  }
+});
+
+app.get('/clients/:id', validateJWT, async (req, res) => {
+  try {
+    const client = await db.getClientById(req.params.id, req.userToken);
+    if (!client) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+    res.json(client);
+  } catch (error) {
+    console.error('Error fetching client:', error);
+    res.status(500).json({ error: 'Failed to fetch client' });
+  }
+});
+
+app.put('/clients/:id', validateJWT, async (req, res) => {
+  try {
+    const client = await db.updateClient(req.params.id, req.body, req.userToken);
+    if (!client) {
+      return res.status(404).json({ error: 'Client not found' });
+    }
+    res.json(client);
+  } catch (error) {
+    console.error('Error updating client:', error);
+    res.status(500).json({ error: 'Failed to update client' });
+  }
+});
+
+app.delete('/clients/:id', validateJWT, async (req, res) => {
+  try {
+    await db.deleteClient(req.params.id, req.userToken);
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting client:', error);
+    res.status(500).json({ error: 'Failed to delete client' });
+  }
+});
+
 app.listen(3000, () => console.log('Server ready on port 3000.'));
 
 module.exports = app;

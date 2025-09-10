@@ -46,4 +46,62 @@ async function handle(result) {
     throw err;
   }
 }
-module.exports = { supabase, getSupabaseClient, handle };
+// Client CRUD operations
+async function createClient(clientData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('clients')
+    .insert(clientData)
+    .select()
+    .single()
+  );
+}
+
+async function getAllClients(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('clients')
+    .select('*')
+  );
+}
+
+async function getClientById(clientId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('clients')
+    .select('*')
+    .eq('client_id', clientId)
+    .single()
+  );
+}
+
+async function updateClient(clientId, clientData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('clients')
+    .update(clientData)
+    .eq('client_id', clientId)
+    .select()
+    .single()
+  );
+}
+
+async function deleteClient(clientId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('clients')
+    .delete()
+    .eq('client_id', clientId)
+  );
+}
+
+module.exports = { 
+  supabase, 
+  getSupabaseClient, 
+  handle,
+  createClient,
+  getAllClients,
+  getClientById,
+  updateClient,
+  deleteClient
+};
