@@ -185,6 +185,71 @@ app.delete('/clients/:id', validateJWT, async (req, res) => {
   }
 });
 
+// Calls routes
+app.post('/calls', validateJWTWithOrg, async (req, res) => {
+  try {
+    const callData = {
+      ...req.body,
+      org_id: req.user.org_id,
+      user_id: req.user.id
+    };
+    const call = await db.createCall(callData, req.userToken);
+    res.status(201).json(call);
+  } catch (error) {
+    console.error('Error creating call:', error);
+    res.status(500).json({ error: 'Failed to create call' });
+  }
+});
+
+app.get('/calls', validateJWT, async (req, res) => {
+  try {
+    const calls = await db.getAllCalls(req.userToken);
+    res.json(calls);
+  } catch (error) {
+    console.error('Error fetching calls:', error);
+    res.status(500).json({ error: 'Failed to fetch calls' });
+  }
+});
+
+app.get('/calls/:id', validateJWT, async (req, res) => {
+  try {
+    const call = await db.getCallById(req.params.id, req.userToken);
+    if (!call) {
+      return res.status(404).json({ error: 'Call not found' });
+    }
+    res.json(call);
+  } catch (error) {
+    console.error('Error fetching call:', error);
+    res.status(500).json({ error: 'Failed to fetch call' });
+  }
+});
+
+app.put('/calls/:id', validateJWT, async (req, res) => {
+  try {
+    const call = await db.updateCall(req.params.id, req.body, req.userToken);
+    if (!call) {
+      return res.status(404).json({ error: 'Call not found' });
+    }
+    res.json(call);
+  } catch (error) {
+    console.error('Error updating call:', error);
+    res.status(500).json({ error: 'Failed to update call' });
+  }
+});
+
+app.delete('/calls/:id', validateJWT, async (req, res) => {
+  try {
+    await db.deleteCall(req.params.id, req.userToken);
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting call:', error);
+    res.status(500).json({ error: 'Failed to delete call' });
+  }
+});
+
+
+
+
 app.listen(3000, () => console.log('Server ready on port 3000.'));
 
 module.exports = app;
