@@ -185,6 +185,128 @@ app.delete('/clients/:id', validateJWT, async (req, res) => {
   }
 });
 
+// Driver Unavailability routes
+app.get('/driver-unavailability', validateJWT, async (req, res) => {
+  try {
+    const unavailabilities = await db.getAllDriverUnavailabilities(req.userToken);
+    res.json(unavailabilities);
+  } catch (error) {
+    console.error('Error fetching driver unavailabilities:', error);
+    res.status(500).json({ error: 'Failed to fetch driver unavailabilities' });
+  }
+});
+
+app.get('/driver-unavailability/:id', validateJWT, async (req, res) => {
+  try {
+    const unavailability = await db.getDriverUnavailabilityById(req.params.id, req.userToken);
+    if (!unavailability) {
+      return res.status(404).json({ error: 'Driver unavailability not found' });
+    }
+    res.json(unavailability);
+  } catch (error) {
+    console.error('Error fetching driver unavailability:', error);
+    res.status(500).json({ error: 'Failed to fetch driver unavailability' });
+  }
+});
+
+app.put('/driver-unavailability/:id', validateJWT, async (req, res) => {
+  try {
+    const unavailability = await db.updateDriverUnavailability(req.params.id, req.body, req.userToken);
+    if (!unavailability) {
+      return res.status(404).json({ error: 'Driver unavailability not found' });
+    }
+    res.json(unavailability);
+  } catch (error) {
+    console.error('Error updating driver unavailability:', error);
+    res.status(500).json({ error: 'Failed to update driver unavailability' });
+  }
+});
+
+app.delete('/driver-unavailability/:id', validateJWT, async (req, res) => {
+  try {
+    await db.deleteDriverUnavailability(req.params.id, req.userToken);
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting driver unavailability:', error);
+    res.status(500).json({ error: 'Failed to delete driver unavailability' });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+// Rides routes
+app.get('/rides', validateJWT, async (req, res) => {
+  try {
+    const rides = await db.getAllRides(req.userToken);
+    res.json(rides);
+  } catch (error) {
+    console.error('Error fetching rides:', error);
+    res.status(500).json({ error: 'Failed to fetch rides' });
+  }
+});
+
+app.get('/rides/:ride_id', validateJWT, async (req, res) => {
+  try {
+    const ride = await db.getRideById(req.params.ride_id, req.userToken);
+    if (!ride) {
+      return res.status(404).json({ error: 'Ride not found' });
+    }
+    res.json(ride);
+  } catch (error) {
+    console.error('Error fetching ride:', error);
+    res.status(500).json({ error: 'Failed to fetch ride' });
+  }
+});
+
+app.put('/rides/:ride_id', validateJWT, async (req, res) => {
+  try {
+    const ride = await db.updateRide(req.params.ride_id, req.body, req.userToken);
+    if (!ride) {
+      return res.status(404).json({ error: 'Ride not found' });
+    }
+    res.json(ride);
+  } catch (error) {
+    console.error('Error updating ride:', error);
+    res.status(500).json({ error: 'Failed to update ride' });
+  }
+});
+
+app.delete('/rides/:ride_id', validateJWT, async (req, res) => {
+  try {
+    await db.deleteRide(req.params.ride_id, req.userToken);
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting ride:', error);
+    res.status(500).json({ error: 'Failed to delete ride' });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Calls routes
 app.post('/calls', validateJWTWithOrg, async (req, res) => {
   try {
@@ -253,3 +375,53 @@ app.delete('/calls/:id', validateJWT, async (req, res) => {
 app.listen(3000, () => console.log('Server ready on port 3000.'));
 
 module.exports = app;
+
+
+
+
+// Driver Unavailability routes
+app.get('/driver-unavailability', validateJWT, async (req, res) => {
+  try {
+    const unavailabilities = await db.getAllDriverUnavailabilities(req.userToken);
+    res.json(unavailabilities);
+  } catch (error) {
+    console.error('Error fetching driver unavailabilities:', error);
+    res.status(500).json({ error: 'Failed to fetch driver unavailabilities' });
+  }
+});
+
+app.get('/driver-unavailability/:id', validateJWT, async (req, res) => {
+  try {
+    const unavailability = await db.getDriverUnavailabilityById(req.params.id, req.userToken);
+    if (!unavailability) {
+      return res.status(404).json({ error: 'Driver unavailability not found' });
+    }
+    res.json(unavailability);
+  } catch (error) {
+    console.error('Error fetching driver unavailability:', error);
+    res.status(500).json({ error: 'Failed to fetch driver unavailability' });
+  }
+});
+
+app.put('/driver-unavailability/:id', validateJWT, async (req, res) => {
+  try {
+    const unavailability = await db.updateDriverUnavailability(req.params.id, req.body, req.userToken);
+    if (!unavailability) {
+      return res.status(404).json({ error: 'Driver unavailability not found' });
+    }
+    res.json(unavailability);
+  } catch (error) {
+    console.error('Error updating driver unavailability:', error);
+    res.status(500).json({ error: 'Failed to update driver unavailability' });
+  }
+});
+
+app.delete('/driver-unavailability/:id', validateJWT, async (req, res) => {
+  try {
+    await db.deleteDriverUnavailability(req.params.id, req.userToken);
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting driver unavailability:', error);
+    res.status(500).json({ error: 'Failed to delete driver unavailability' });
+  }
+});

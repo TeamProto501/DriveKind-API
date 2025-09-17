@@ -144,6 +144,60 @@ async function deleteCall(callId, userToken) {
   );
 }
 
+// Driver Unavailability CRUD operations
+async function createDriverUnavailability(unavailabilityData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('driver_unavailability')
+    .insert(unavailabilityData)
+    .select()
+    .single()
+  );
+}
+
+async function getAllDriverUnavailabilities(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('driver_unavailability')
+    .select('*')
+  );
+}
+
+async function getDriverUnavailabilityById(id, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('driver_unavailability')
+    .select('*')
+    .eq('id', id)
+    .single()
+  );
+}
+
+async function updateDriverUnavailability(id, unavailabilityData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('driver_unavailability')
+    .update(unavailabilityData)
+    .eq('id', id)
+    .select()
+    .single()
+  );
+}
+
+async function deleteDriverUnavailability(id, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('driver_unavailability')
+    .delete()
+    .eq('id', id)
+  );
+}
+
+
+
+
+
+
 module.exports = {
   supabase,
   getSupabaseClient,
@@ -158,4 +212,10 @@ module.exports = {
   getCallById,
   updateCall,
   deleteCall
+  deleteCall,
+  createDriverUnavailability,
+  getAllDriverUnavailabilities,
+  getDriverUnavailabilityById,
+  updateDriverUnavailability,
+  deleteDriverUnavailability
 };
