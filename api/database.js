@@ -211,7 +211,6 @@ module.exports = {
   getAllCalls,
   getCallById,
   updateCall,
-  deleteCall
   deleteCall,
   createDriverUnavailability,
   getAllDriverUnavailabilities,
