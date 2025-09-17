@@ -150,15 +150,27 @@ async function createDriverUnavailability(unavailabilityData, userToken) {
   return handle(client
     .from('driver_unavailability')
     .insert(unavailabilityData)
-    .select()
+// Timecards CRUD operations
+async function createTimecard(timecardData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('timecards')
+    .insert(timecardData)
+     .select()
     .single()
   );
 }
 
-async function getAllDriverUnavailabilities(userToken) {
+ async function getAllDriverUnavailabilities(userToken) {
   const client = getSupabaseClient(userToken);
   return handle(client
     .from('driver_unavailability')
+ 
+    async function getAllTimecards(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('timecards')
+
     .select('*')
   );
 }
@@ -169,6 +181,12 @@ async function getDriverUnavailabilityById(id, userToken) {
     .from('driver_unavailability')
     .select('*')
     .eq('id', id)
+async function getTimecardById(timecardId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('timecards')
+    .select('*')
+    .eq('timecard_id', timecardId)
     .single()
   );
 }
@@ -179,6 +197,13 @@ async function updateDriverUnavailability(id, unavailabilityData, userToken) {
     .from('driver_unavailability')
     .update(unavailabilityData)
     .eq('id', id)
+                
+async function updateTimecard(timecardId, timecardData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('timecards')
+    .update(timecardData)
+    .eq('timecard_id', timecardId)
     .select()
     .single()
   );
@@ -194,9 +219,14 @@ async function deleteDriverUnavailability(id, userToken) {
 }
 
 
-
-
-
+async function deleteTimecard(timecardId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('timecards')
+    .delete()
+    .eq('timecard_id', timecardId)
+  );
+}
 
 module.exports = {
   supabase,
@@ -217,4 +247,9 @@ module.exports = {
   getDriverUnavailabilityById,
   updateDriverUnavailability,
   deleteDriverUnavailability
+createTimecard,
+  getAllTimecards,
+  getTimecardById,
+  updateTimecard,
+  deleteTimecard
 };
