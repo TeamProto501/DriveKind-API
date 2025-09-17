@@ -95,13 +95,67 @@ async function deleteClient(clientId, userToken) {
   );
 }
 
-module.exports = { 
-  supabase, 
-  getSupabaseClient, 
+// Calls CRUD operations
+async function createCall(callData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('calls')
+    .insert(callData)
+    .select()
+    .single()
+  );
+}
+
+async function getAllCalls(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('calls')
+    .select('*')
+  );
+}
+
+async function getCallById(callId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('calls')
+    .select('*')
+    .eq('call_id', callId)
+    .single()
+  );
+}
+
+async function updateCall(callId, callData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('calls')
+    .update(callData)
+    .eq('call_id', callId)
+    .select()
+    .single()
+  );
+}
+
+async function deleteCall(callId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('calls')
+    .delete()
+    .eq('call_id', callId)
+  );
+}
+
+module.exports = {
+  supabase,
+  getSupabaseClient,
   handle,
   createClient,
   getAllClients,
   getClientById,
   updateClient,
-  deleteClient
+  deleteClient,
+  createCall,
+  getAllCalls,
+  getCallById,
+  updateCall,
+  deleteCall
 };
