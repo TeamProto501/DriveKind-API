@@ -144,6 +144,55 @@ async function deleteCall(callId, userToken) {
   );
 }
 
+// Timecards CRUD operations
+async function createTimecard(timecardData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('timecards')
+    .insert(timecardData)
+    .select()
+    .single()
+  );
+}
+
+async function getAllTimecards(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('timecards')
+    .select('*')
+  );
+}
+
+async function getTimecardById(timecardId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('timecards')
+    .select('*')
+    .eq('timecard_id', timecardId)
+    .single()
+  );
+}
+
+async function updateTimecard(timecardId, timecardData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('timecards')
+    .update(timecardData)
+    .eq('timecard_id', timecardId)
+    .select()
+    .single()
+  );
+}
+
+async function deleteTimecard(timecardId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('timecards')
+    .delete()
+    .eq('timecard_id', timecardId)
+  );
+}
+
 module.exports = {
   supabase,
   getSupabaseClient,
@@ -157,5 +206,10 @@ module.exports = {
   getAllCalls,
   getCallById,
   updateCall,
-  deleteCall
+  deleteCall,
+  createTimecard,
+  getAllTimecards,
+  getTimecardById,
+  updateTimecard,
+  deleteTimecard
 };
