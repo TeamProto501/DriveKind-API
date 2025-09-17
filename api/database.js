@@ -144,25 +144,43 @@ async function deleteCall(callId, userToken) {
   );
 }
 
+// Driver Unavailability CRUD operations
+async function createDriverUnavailability(unavailabilityData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('driver_unavailability')
+    .insert(unavailabilityData)
 // Timecards CRUD operations
 async function createTimecard(timecardData, userToken) {
   const client = getSupabaseClient(userToken);
   return handle(client
     .from('timecards')
     .insert(timecardData)
-    .select()
+     .select()
     .single()
   );
 }
 
-async function getAllTimecards(userToken) {
+ async function getAllDriverUnavailabilities(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('driver_unavailability')
+ 
+    async function getAllTimecards(userToken) {
   const client = getSupabaseClient(userToken);
   return handle(client
     .from('timecards')
+
     .select('*')
   );
 }
 
+async function getDriverUnavailabilityById(id, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('driver_unavailability')
+    .select('*')
+    .eq('id', id)
 async function getTimecardById(timecardId, userToken) {
   const client = getSupabaseClient(userToken);
   return handle(client
@@ -173,6 +191,13 @@ async function getTimecardById(timecardId, userToken) {
   );
 }
 
+async function updateDriverUnavailability(id, unavailabilityData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('driver_unavailability')
+    .update(unavailabilityData)
+    .eq('id', id)
+                
 async function updateTimecard(timecardId, timecardData, userToken) {
   const client = getSupabaseClient(userToken);
   return handle(client
@@ -183,6 +208,16 @@ async function updateTimecard(timecardId, timecardData, userToken) {
     .single()
   );
 }
+
+async function deleteDriverUnavailability(id, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('driver_unavailability')
+    .delete()
+    .eq('id', id)
+  );
+}
+
 
 async function deleteTimecard(timecardId, userToken) {
   const client = getSupabaseClient(userToken);
@@ -207,7 +242,12 @@ module.exports = {
   getCallById,
   updateCall,
   deleteCall,
-  createTimecard,
+  createDriverUnavailability,
+  getAllDriverUnavailabilities,
+  getDriverUnavailabilityById,
+  updateDriverUnavailability,
+  deleteDriverUnavailability
+createTimecard,
   getAllTimecards,
   getTimecardById,
   updateTimecard,
