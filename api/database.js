@@ -188,7 +188,44 @@ async function deleteTimecard(timecardId, userToken) {
     client.from("timecards").delete().eq("timecard_id", timecardId)
   );
 }
-
+//initial api call made to load admin dashboard on driver table
+async function getDriverForAdminDash(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(
+    client
+      .from("staff_profies")
+      .select(
+        "first_name",
+        "last_name",
+        "role",
+        "email",
+        "dob",
+        "home_address",
+        "city",
+        "state",
+        "zipcode",
+        "primary_phone"
+      )
+      .eq("role", "Driver")
+  );
+}
+async function getClientForAdminDash(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(
+    client
+      .from("clients")
+      .select(
+        "first_name",
+        "last_name",
+        "date_of_birth",
+        "street_address",
+        "city",
+        "state",
+        "zipcode",
+        "primary_phone"
+      )
+  );
+}
 module.exports = {
   supabase,
   getSupabaseClient,
@@ -213,4 +250,6 @@ module.exports = {
   getTimecardById,
   updateTimecard,
   deleteTimecard,
+  getDriverForAdminDash,
+  getClientForAdminDash,
 };
