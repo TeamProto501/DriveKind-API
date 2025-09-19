@@ -209,6 +209,28 @@ async function getDriverForAdminDash(userToken) {
       .eq("role", "Driver")
   );
 }
+//initial api call made to load admin dashboard on volunteer table
+async function getVolunteerForAdminDash(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(
+    client
+      .from("staff_profies")
+      .select(
+        "first_name",
+        "last_name",
+        "role",
+        "email",
+        "dob",
+        "home_address",
+        "city",
+        "state",
+        "zipcode",
+        "primary_phone"
+      )
+      .eq("role", "Volunteer")
+  );
+}
+//initial api call made to load admin dashboard on client table
 async function getClientForAdminDash(userToken) {
   const client = getSupabaseClient(userToken);
   return handle(
