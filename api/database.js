@@ -1,12 +1,14 @@
-const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
-require('dotenv').config();
+const { createClient: createSupabaseClient } = require("@supabase/supabase-js");
+require("dotenv").config();
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
 
 // Validate environment variables
 if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Missing required environment variables: SUPABASE_URL and SUPABASE_KEY must be set');
+  throw new Error(
+    "Missing required environment variables: SUPABASE_URL and SUPABASE_KEY must be set"
+  );
 }
 
 // Create a function to get Supabase client with user context
@@ -14,12 +16,12 @@ function getSupabaseClient(userToken = null) {
   try {
     const client = createSupabaseClient(supabaseUrl, supabaseKey, {
       global: {
-        headers: userToken ? { Authorization: `Bearer ${userToken}` } : {}
-      }
+        headers: userToken ? { Authorization: `Bearer ${userToken}` } : {},
+      },
     });
     return client;
   } catch (error) {
-    console.error('Failed to initialize Supabase client:', error);
+    console.error("Failed to initialize Supabase client:", error);
     throw error;
   }
 }
@@ -29,7 +31,7 @@ let supabase;
 try {
   supabase = createSupabaseClient(supabaseUrl, supabaseKey);
 } catch (error) {
-  console.error('Failed to initialize Supabase client:', error);
+  console.error("Failed to initialize Supabase client:", error);
   throw error;
 }
 
@@ -37,197 +39,215 @@ async function handle(result) {
   try {
     const { data, error } = await result;
     if (error) {
-      console.error('Supabase error:', error);
+      console.error("Supabase error:", error);
       throw new Error(`Database error: ${error.message}`);
     }
     return data;
   } catch (err) {
-    console.error('Database operation failed:', err);
+    console.error("Database operation failed:", err);
     throw err;
   }
 }
 // Client CRUD operations
 async function createClient(clientData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('clients')
-    .insert(clientData)
-    .select()
-    .single()
-  );
+  return handle(client.from("clients").insert(clientData).select().single());
 }
 
 async function getAllClients(userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('clients')
-    .select('*')
-  );
+  return handle(client.from("clients").select("*"));
 }
 
 async function getClientById(clientId, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('clients')
-    .select('*')
-    .eq('client_id', clientId)
-    .single()
+  return handle(
+    client.from("clients").select("*").eq("client_id", clientId).single()
   );
 }
 
 async function updateClient(clientId, clientData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('clients')
-    .update(clientData)
-    .eq('client_id', clientId)
-    .select()
-    .single()
+  return handle(
+    client
+      .from("clients")
+      .update(clientData)
+      .eq("client_id", clientId)
+      .select()
+      .single()
   );
 }
 
 async function deleteClient(clientId, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('clients')
-    .delete()
-    .eq('client_id', clientId)
-  );
+  return handle(client.from("clients").delete().eq("client_id", clientId));
 }
 
 // Calls CRUD operations
 async function createCall(callData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('calls')
-    .insert(callData)
-    .select()
-    .single()
-  );
+  return handle(client.from("calls").insert(callData).select().single());
 }
 
 async function getAllCalls(userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('calls')
-    .select('*')
-  );
+  return handle(client.from("calls").select("*"));
 }
 
 async function getCallById(callId, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('calls')
-    .select('*')
-    .eq('call_id', callId)
-    .single()
+  return handle(
+    client.from("calls").select("*").eq("call_id", callId).single()
   );
 }
 
 async function updateCall(callId, callData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('calls')
-    .update(callData)
-    .eq('call_id', callId)
-    .select()
-    .single()
+  return handle(
+    client
+      .from("calls")
+      .update(callData)
+      .eq("call_id", callId)
+      .select()
+      .single()
   );
 }
 
 async function deleteCall(callId, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('calls')
-    .delete()
-    .eq('call_id', callId)
-  );
+  return handle(client.from("calls").delete().eq("call_id", callId));
 }
 
 // Driver Unavailability CRUD operations
 async function createDriverUnavailability(unavailabilityData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('driver_unavailability')
-    .insert(unavailabilityData)
+  return handle(
+    client.from("driver_unavailability").insert(unavailabilityData)
+  );
+}
 // Timecards CRUD operations
 async function createTimecard(timecardData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('timecards')
-    .insert(timecardData)
-     .select()
-    .single()
+  return handle(
+    client.from("timecards").insert(timecardData).select().single()
   );
 }
 
- async function getAllDriverUnavailabilities(userToken) {
+async function getAllDriverUnavailabilities(userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('driver_unavailability')
- 
-    async function getAllTimecards(userToken) {
-  const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('timecards')
+  return handle(client.from("driver_unavailability"));
+}
 
-    .select('*')
+async function getAllTimecards(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(
+    client
+      .from("timecards")
+
+      .select("*")
   );
 }
 
 async function getDriverUnavailabilityById(id, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('driver_unavailability')
-    .select('*')
-    .eq('id', id)
+  return handle(client.from("driver_unavailability").select("*").eq("id", id));
+}
 async function getTimecardById(timecardId, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('timecards')
-    .select('*')
-    .eq('timecard_id', timecardId)
-    .single()
+  return handle(
+    client.from("timecards").select("*").eq("timecard_id", timecardId).single()
   );
 }
 
 async function updateDriverUnavailability(id, unavailabilityData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('driver_unavailability')
-    .update(unavailabilityData)
-    .eq('id', id)
-                
+  return handle(
+    client.from("driver_unavailability").update(unavailabilityData).eq("id", id)
+  );
+}
 async function updateTimecard(timecardId, timecardData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('timecards')
-    .update(timecardData)
-    .eq('timecard_id', timecardId)
-    .select()
-    .single()
+  return handle(
+    client
+      .from("timecards")
+      .update(timecardData)
+      .eq("timecard_id", timecardId)
+      .select()
+      .single()
   );
 }
 
 async function deleteDriverUnavailability(id, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('driver_unavailability')
-    .delete()
-    .eq('id', id)
-  );
+  return handle(client.from("driver_unavailability").delete().eq("id", id));
 }
-
 
 async function deleteTimecard(timecardId, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('timecards')
-    .delete()
-    .eq('timecard_id', timecardId)
+  return handle(
+    client.from("timecards").delete().eq("timecard_id", timecardId)
   );
 }
-
+//initial api call made to load admin dashboard on driver table
+async function getDriverForAdminDash(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(
+    client
+      .from("staff_profies")
+      .select(
+        "first_name",
+        "last_name",
+        "role",
+        "email",
+        "dob",
+        "home_address",
+        "city",
+        "state",
+        "zipcode",
+        "primary_phone"
+      )
+      .eq("role", "Driver")
+  );
+}
+//initial api call made to load admin dashboard on volunteer table
+async function getVolunteerForAdminDash(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(
+    client
+      .from("staff_profies")
+      .select(
+        "first_name",
+        "last_name",
+        "role",
+        "email",
+        "dob",
+        "home_address",
+        "city",
+        "state",
+        "zipcode",
+        "primary_phone"
+      )
+      .eq("role", "Volunteer")
+  );
+}
+//initial api call made to load admin dashboard on client table
+async function getClientForAdminDash(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(
+    client
+      .from("clients")
+      .select(
+        "first_name",
+        "last_name",
+        "date_of_birth",
+        "street_address",
+        "city",
+        "state",
+        "zipcode",
+        "primary_phone"
+      )
+  );
+}
 module.exports = {
   supabase,
   getSupabaseClient,
@@ -246,10 +266,12 @@ module.exports = {
   getAllDriverUnavailabilities,
   getDriverUnavailabilityById,
   updateDriverUnavailability,
-  deleteDriverUnavailability
-createTimecard,
+  deleteDriverUnavailability,
+  createTimecard,
   getAllTimecards,
   getTimecardById,
   updateTimecard,
-  deleteTimecard
+  deleteTimecard,
+  getDriverForAdminDash,
+  getClientForAdminDash,
 };
