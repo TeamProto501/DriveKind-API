@@ -369,6 +369,68 @@ app.delete('/calls/:id', validateJWT, async (req, res) => {
   }
 });
 
+// Timecards routes
+app.post('/timecards', validateJWTWithOrg, async (req, res) => {
+  try {
+    const timecardData = {
+      ...req.body,
+      org_id: req.user.org_id,
+      user_id: req.user.id
+    };
+    const timecard = await db.createTimecard(timecardData, req.userToken);
+    res.status(201).json(timecard);
+  } catch (error) {
+    console.error('Error creating timecard:', error);
+    res.status(500).json({ error: 'Failed to create timecard' });
+  }
+});
+
+app.get('/timecards', validateJWT, async (req, res) => {
+  try {
+    const timecards = await db.getAllTimecards(req.userToken);
+    res.json(timecards);
+  } catch (error) {
+    console.error('Error fetching timecards:', error);
+    res.status(500).json({ error: 'Failed to fetch timecards' });
+  }
+});
+
+app.get('/timecards/:id', validateJWT, async (req, res) => {
+  try {
+    const timecard = await db.getTimecardById(req.params.id, req.userToken);
+    if (!timecard) {
+      return res.status(404).json({ error: 'Timecard not found' });
+    }
+    res.json(timecard);
+  } catch (error) {
+    console.error('Error fetching timecard:', error);
+    res.status(500).json({ error: 'Failed to fetch timecard' });
+  }
+});
+
+app.put('/timecards/:id', validateJWT, async (req, res) => {
+  try {
+    const timecard = await db.updateTimecard(req.params.id, req.body, req.userToken);
+    if (!timecard) {
+      return res.status(404).json({ error: 'Timecard not found' });
+    }
+    res.json(timecard);
+  } catch (error) {
+    console.error('Error updating timecard:', error);
+    res.status(500).json({ error: 'Failed to update timecard' });
+  }
+});
+
+app.delete('/timecards/:id', validateJWT, async (req, res) => {
+  try {
+    await db.deleteTimecard(req.params.id, req.userToken);
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting timecard:', error);
+    res.status(500).json({ error: 'Failed to delete timecard' });
+  }
+});
+
 
 
 
