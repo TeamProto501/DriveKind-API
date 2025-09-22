@@ -599,6 +599,63 @@ app.delete('/vehicles/:id', validateJWT, async (req, res) => {
 });
 
 
+// Organization routes
+app.post('/organizations', validateJWT, async (req, res) => {
+  try {
+    const organization = await db.createOrganization(req.body, req.userToken);
+    res.status(201).json(organization);
+  } catch (error) {
+    console.error('Error creating organization:', error);
+    res.status(500).json({ error: 'Failed to create organization' });
+  }
+});
+
+app.get('/organizations', validateJWT, async (req, res) => {
+  try {
+    const organizations = await db.getAllOrganizations(req.userToken);
+    res.json(organizations);
+  } catch (error) {
+    console.error('Error fetching organizations:', error);
+    res.status(500).json({ error: 'Failed to fetch organizations' });
+  }
+});
+
+app.get('/organizations/:id', validateJWT, async (req, res) => {
+  try {
+    const organization = await db.getOrganizationById(req.params.id, req.userToken);
+    if (!organization) {
+      return res.status(404).json({ error: 'Organization not found' });
+    }
+    res.json(organization);
+  } catch (error) {
+    console.error('Error fetching organization:', error);
+    res.status(500).json({ error: 'Failed to fetch organization' });
+  }
+});
+
+app.put('/organizations/:id', validateJWT, async (req, res) => {
+  try {
+    const organization = await db.updateOrganization(req.params.id, req.body, req.userToken);
+    if (!organization) {
+      return res.status(404).json({ error: 'Organization not found' });
+    }
+    res.json(organization);
+  } catch (error) {
+    console.error('Error updating organization:', error);
+    res.status(500).json({ error: 'Failed to update organization' });
+  }
+});
+
+app.delete('/organizations/:id', validateJWT, async (req, res) => {
+  try {
+    await db.deleteOrganization(req.params.id, req.userToken);
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting organization:', error);
+    res.status(500).json({ error: 'Failed to delete organization' });
+  }
+});
+
 app.listen(3000, () => console.log('Server ready on port 3000.'));
  
 module.exports = app;

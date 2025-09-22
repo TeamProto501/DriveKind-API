@@ -369,6 +369,55 @@ async function deleteVehicle(vehicleId, userToken) {
   );
 }
 
+// Organization CRUD operations
+async function createOrganization(orgData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('organization')
+    .insert(orgData)
+    .select()
+    .single()
+  );
+}
+
+async function getAllOrganizations(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('organization')
+    .select('*')
+  );
+}
+
+async function getOrganizationById(orgId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('organization')
+    .select('*')
+    .eq('org_id', orgId)
+    .single()
+  );
+}
+
+async function updateOrganization(orgId, orgData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('organization')
+    .update(orgData)
+    .eq('org_id', orgId)
+    .select()
+    .single()
+  );
+}
+
+async function deleteOrganization(orgId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('organization')
+    .delete()
+    .eq('org_id', orgId)
+  );
+}
+
 
 
 module.exports = {
@@ -407,5 +456,10 @@ module.exports = {
   getAllVehicles,
   getVehicleById,
   updateVehicle,
-  deleteVehicle
+  deleteVehicle,
+  createOrganization,
+  getAllOrganizations,
+  getOrganizationById,
+  updateOrganization,
+  deleteOrganization
 }; 
