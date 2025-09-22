@@ -177,61 +177,7 @@ async function updateTimecard(timecardId, timecardData, userToken) {
   );
 }
 
-async function deleteDriverUnavailability(id, userToken) {
-  const client = getSupabaseClient(userToken);
-  return handle(client.from("driver_unavailability").delete().eq("id", id));
-}
 
-async function deleteTimecard(timecardId, userToken) {
-  const client = getSupabaseClient(userToken);
-  return handle(
-    client.from("timecards").delete().eq("timecard_id", timecardId)
-  );
-}
-//initial api call made to load admin dashboard on driver table
-async function getDriverForAdminDash(userToken) {
-  const client = getSupabaseClient(userToken);
-  return handle(
-    client
-      .from("staff_profies")
-      .select(
-        "first_name",
-        "last_name",
-        "role",
-        "email",
-        "dob",
-        "home_address",
-        "city",
-        "state",
-        "zipcode",
-        "primary_phone"
-      )
-      .eq("role", "Driver")
-  );
-}
-//initial api call made to load admin dashboard on volunteer table
-async function getVolunteerForAdminDash(userToken) {
-  const client = getSupabaseClient(userToken);
-  return handle(
-    client
-      .from("staff_profies")
-      .select(
-        "first_name",
-        "last_name",
-        "role",
-        "email",
-        "dob",
-        "home_address",
-        "city",
-        "state",
-        "zipcode",
-        "primary_phone"
-      )
-      .eq("role", "Volunteer")
-  );
-}
-
-// Timecards CRUD operations
 async function createTimecard(timecardData, userToken) {
   const client = getSupabaseClient(userToken);
   return handle(client
@@ -477,6 +423,78 @@ async function getClientForAdminDash(userToken) {
   );
 }
 module.exports = {
+ async function deleteDriverUnavailability(id, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client.from("driver_unavailability").delete().eq("id", id));
+}
+
+async function deleteTimecard(timecardId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(
+    client.from("timecards").delete().eq("timecard_id", timecardId)
+  );
+}
+//initial api call made to load admin dashboard on driver table
+async function getDriverForAdminDash(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(
+    client
+      .from("staff_profies")
+      .select(
+        "first_name",
+        "last_name",
+        "role",
+        "email",
+        "dob",
+        "home_address",
+        "city",
+        "state",
+        "zipcode",
+        "primary_phone"
+      )
+      .eq("role", "Driver")
+  );
+}
+//initial api call made to load admin dashboard on volunteer table
+async function getVolunteerForAdminDash(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(
+    client
+      .from("staff_profies")
+      .select(
+        "first_name",
+        "last_name",
+        "role",
+        "email",
+        "dob",
+        "home_address",
+        "city",
+        "state",
+        "zipcode",
+        "primary_phone"
+      )
+      .eq("role", "Volunteer")
+  );
+}
+//initial api call made to load admin dashboard on client table
+async function getClientForAdminDash(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(
+    client
+      .from("clients")
+      .select(
+        "first_name",
+        "last_name",
+        "date_of_birth",
+        "street_address",
+        "city",
+        "state",
+        "zipcode",
+        "primary_phone"
+      )
+  );
+}
+ module.exports = {
   supabase,
   getSupabaseClient,
   handle,
@@ -494,5 +512,33 @@ module.exports = {
   getAllDriverUnavailabilities,
   getDriverUnavailabilityById,
   updateDriverUnavailability,
+  deleteDriverUnavailability,
+  createTimecard,
+  getAllTimecards,
+  getTimecardById,
+  updateTimecard,
+  deleteTimecard,
+   createStaffProfile,
+  getAllStaffProfiles,
+  getStaffProfileById,
+  updateStaffProfile,
+  deleteStaffProfile,
+  createTransactionAuditLog,
+  getAllTransactionAuditLogs,
+  getTransactionAuditLogById,
+  createVehicle,
+  getAllVehicles,
+  getVehicleById,
+  updateVehicle,
+  deleteVehicle,
+  createOrganization,
+  getAllOrganizations,
+  getOrganizationById,
+  updateOrganization,
+  deleteOrganization, 
+   getDriverForAdminDash,
+  getClientForAdminDash,
+};
+ 
   deleteDriverUnavailability
 };
