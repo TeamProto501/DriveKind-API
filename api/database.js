@@ -320,6 +320,54 @@ async function getTransactionAuditLogById(transactionId, userToken) {
   );
 }
 
+// Vehicles CRUD operations
+async function createVehicle(vehicleData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('vehicles')
+    .insert(vehicleData)
+    .select()
+    .single()
+  );
+}
+
+async function getAllVehicles(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('vehicles')
+    .select('*')
+  );
+}
+
+async function getVehicleById(vehicleId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('vehicles')
+    .select('*')
+    .eq('vehicle_id', vehicleId)
+    .single()
+  );
+}
+
+async function updateVehicle(vehicleId, vehicleData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('vehicles')
+    .update(vehicleData)
+    .eq('vehicle_id', vehicleId)
+    .select()
+    .single()
+  );
+}
+
+async function deleteVehicle(vehicleId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('vehicles')
+    .delete()
+    .eq('vehicle_id', vehicleId)
+  );
+}
 
 
 
@@ -354,5 +402,10 @@ module.exports = {
   deleteStaffProfile,
   createTransactionAuditLog,
   getAllTransactionAuditLogs,
-  getTransactionAuditLogById
+  getTransactionAuditLogById,
+  createVehicle,
+  getAllVehicles,
+  getVehicleById,
+  updateVehicle,
+  deleteVehicle
 }; 

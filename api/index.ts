@@ -537,6 +537,67 @@ app.get('/transactions-audit-log/:id', validateJWT, async (req, res) => {
   }
 });
 
+// Vehicles routes
+app.post('/vehicles', validateJWT, async (req, res) => {
+  try {
+    const vehicleData = {
+      ...req.body,
+      user_id: req.user.id
+    };
+    const vehicle = await db.createVehicle(vehicleData, req.userToken);
+    res.status(201).json(vehicle);
+  } catch (error) {
+    console.error('Error creating vehicle:', error);
+    res.status(500).json({ error: 'Failed to create vehicle' });
+  }
+});
+
+app.get('/vehicles', validateJWT, async (req, res) => {
+  try {
+    const vehicles = await db.getAllVehicles(req.userToken);
+    res.json(vehicles);
+  } catch (error) {
+    console.error('Error fetching vehicles:', error);
+    res.status(500).json({ error: 'Failed to fetch vehicles' });
+  }
+});
+
+app.get('/vehicles/:id', validateJWT, async (req, res) => {
+  try {
+    const vehicle = await db.getVehicleById(req.params.id, req.userToken);
+    if (!vehicle) {
+      return res.status(404).json({ error: 'Vehicle not found' });
+    }
+    res.json(vehicle);
+  } catch (error) {
+    console.error('Error fetching vehicle:', error);
+    res.status(500).json({ error: 'Failed to fetch vehicle' });
+  }
+});
+
+app.put('/vehicles/:id', validateJWT, async (req, res) => {
+  try {
+    const vehicle = await db.updateVehicle(req.params.id, req.body, req.userToken);
+    if (!vehicle) {
+      return res.status(404).json({ error: 'Vehicle not found' });
+    }
+    res.json(vehicle);
+  } catch (error) {
+    console.error('Error updating vehicle:', error);
+    res.status(500).json({ error: 'Failed to update vehicle' });
+  }
+});
+
+app.delete('/vehicles/:id', validateJWT, async (req, res) => {
+  try {
+    await db.deleteVehicle(req.params.id, req.userToken);
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting vehicle:', error);
+    res.status(500).json({ error: 'Failed to delete vehicle' });
+  }
+});
+
 
 app.listen(3000, () => console.log('Server ready on port 3000.'));
  
