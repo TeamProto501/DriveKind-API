@@ -498,6 +498,46 @@ app.delete('/staff-profiles/:id', validateJWT, async (req, res) => {
 });
 
 
+// Transactions Audit Log routes
+app.post('/transactions-audit-log', validateJWTWithOrg, async (req, res) => {
+  try {
+    const logData = {
+      ...req.body,
+      org_id: req.user.org_id,
+      user_id: req.user.id
+    };
+    const logEntry = await db.createTransactionAuditLog(logData, req.userToken);
+    res.status(201).json(logEntry);
+  } catch (error) {
+    console.error('Error creating transaction audit log:', error);
+    res.status(500).json({ error: 'Failed to create transaction audit log' });
+  }
+});
+
+app.get('/transactions-audit-log', validateJWT, async (req, res) => {
+  try {
+    const logs = await db.getAllTransactionAuditLogs(req.userToken);
+    res.json(logs);
+  } catch (error) {
+    console.error('Error fetching transaction audit logs:', error);
+    res.status(500).json({ error: 'Failed to fetch transaction audit logs' });
+  }
+});
+
+app.get('/transactions-audit-log/:id', validateJWT, async (req, res) => {
+  try {
+    const log = await db.getTransactionAuditLogById(req.params.id, req.userToken);
+    if (!log) {
+      return res.status(404).json({ error: 'Transaction audit log not found' });
+    }
+    res.json(log);
+  } catch (error) {
+    console.error('Error fetching transaction audit log:', error);
+    res.status(500).json({ error: 'Failed to fetch transaction audit log' });
+  }
+});
+
+
 app.listen(3000, () => console.log('Server ready on port 3000.'));
  
 module.exports = app;

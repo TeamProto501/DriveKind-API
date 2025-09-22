@@ -291,6 +291,35 @@ async function deleteStaffProfile(userId, userToken) {
   );
 }
 
+// Transactions Audit Log operations
+async function createTransactionAuditLog(logData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('transactions_audit_log')
+    .insert(logData)
+    .select()
+    .single()
+  );
+}
+
+async function getAllTransactionAuditLogs(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('transactions_audit_log')
+    .select('*')
+  );
+}
+
+async function getTransactionAuditLogById(transactionId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('transactions_audit_log')
+    .select('*')
+    .eq('transaction_id', transactionId)
+    .single()
+  );
+}
+
 
 
 
@@ -322,5 +351,8 @@ module.exports = {
   getAllStaffProfiles,
   getStaffProfileById,
   updateStaffProfile,
-  deleteStaffProfile
+  deleteStaffProfile,
+  createTransactionAuditLog,
+  getAllTransactionAuditLogs,
+  getTransactionAuditLogById
 }; 
