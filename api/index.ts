@@ -436,11 +436,68 @@ app.delete('/timecards/:id', validateJWT, async (req, res) => {
 });
 
 
+// Staff Profiles routes
+app.post('/staff-profiles', validateJWTWithOrg, async (req, res) => {
+  try {
+    const profileData = {
+      ...req.body,
+      org_id: req.user.org_id,
+    };
+    const profile = await db.createStaffProfile(profileData, req.userToken);
+    res.status(201).json(profile);
+  } catch (error) {
+    console.error('Error creating staff profile:', error);
+    res.status(500).json({ error: 'Failed to create staff profile' });
+  }
+});
+
+app.get('/staff-profiles', validateJWT, async (req, res) => {
+  try {
+    const profiles = await db.getAllStaffProfiles(req.userToken);
+    res.json(profiles);
+  } catch (error) {
+    console.error('Error fetching staff profiles:', error);
+    res.status(500).json({ error: 'Failed to fetch staff profiles' });
+  }
+});
+
+app.get('/staff-profiles/:id', validateJWT, async (req, res) => {
+  try {
+    const profile = await db.getStaffProfileById(req.params.id, req.userToken);
+    if (!profile) {
+      return res.status(404).json({ error: 'Staff profile not found' });
+    }
+    res.json(profile);
+  } catch (error) {
+    console.error('Error fetching staff profile:', error);
+    res.status(500).json({ error: 'Failed to fetch staff profile' });
+  }
+});
+
+app.put('/staff-profiles/:id', validateJWT, async (req, res) => {
+  try {
+    const profile = await db.updateStaffProfile(req.params.id, req.body, req.userToken);
+    if (!profile) {
+      return res.status(404).json({ error: 'Staff profile not found' });
+    }
+    res.json(profile);
+  } catch (error) {
+    console.error('Error updating staff profile:', error);
+    res.status(500).json({ error: 'Failed to update staff profile' });
+  }
+});
+
+app.delete('/staff-profiles/:id', validateJWT, async (req, res) => {
+  try {
+    await db.deleteStaffProfile(req.params.id, req.userToken);
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting staff profile:', error);
+    res.status(500).json({ error: 'Failed to delete staff profile' });
+  }
+});
+
+
 app.listen(3000, () => console.log('Server ready on port 3000.'));
 
 module.exports = app;
-
-
-
-
-

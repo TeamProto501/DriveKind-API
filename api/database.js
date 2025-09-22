@@ -242,6 +242,54 @@ async function deleteTimecard(timecardId, userToken) {
   );
 }
 
+// Staff Profiles CRUD operations
+async function createStaffProfile(profileData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('staff_profiles')
+    .insert(profileData)
+    .select()
+    .single()
+  );
+}
+
+async function getAllStaffProfiles(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('staff_profiles')
+    .select('*')
+  );
+}
+
+async function getStaffProfileById(userId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('staff_profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .single()
+  );
+}
+
+async function updateStaffProfile(userId, profileData, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('staff_profiles')
+    .update(profileData)
+    .eq('user_id', userId)
+    .select()
+    .single()
+  );
+}
+
+async function deleteStaffProfile(userId, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(client
+    .from('staff_profiles')
+    .delete()
+    .eq('user_id', userId)
+  );
+}
 
 
 
@@ -269,5 +317,10 @@ module.exports = {
   getAllTimecards,
   getTimecardById,
   updateTimecard,
-  deleteTimecard
+  deleteTimecard,
+  createStaffProfile,
+  getAllStaffProfiles,
+  getStaffProfileById,
+  updateStaffProfile,
+  deleteStaffProfile
 };
