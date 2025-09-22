@@ -372,6 +372,70 @@ app.delete('/calls/:id', validateJWT, async (req, res) => {
 
 
 
+
+// Timecards routes
+app.post('/timecards', validateJWTWithOrg, async (req, res) => {
+  try {
+    const timecardData = {
+      ...req.body,
+      org_id: req.user.org_id,
+      user_id: req.user.id
+    };
+    const timecard = await db.createTimecard(timecardData, req.userToken);
+    res.status(201).json(timecard);
+  } catch (error) {
+    console.error('Error creating timecard:', error);
+    res.status(500).json({ error: 'Failed to create timecard' });
+  }
+});
+
+app.get('/timecards', validateJWT, async (req, res) => {
+  try {
+    const timecards = await db.getAllTimecards(req.userToken);
+    res.json(timecards);
+  } catch (error) {
+    console.error('Error fetching timecards:', error);
+    res.status(500).json({ error: 'Failed to fetch timecards' });
+  }
+});
+
+app.get('/timecards/:id', validateJWT, async (req, res) => {
+  try {
+    const timecard = await db.getTimecardById(req.params.id, req.userToken);
+    if (!timecard) {
+      return res.status(404).json({ error: 'Timecard not found' });
+    }
+    res.json(timecard);
+  } catch (error) {
+    console.error('Error fetching timecard:', error);
+    res.status(500).json({ error: 'Failed to fetch timecard' });
+  }
+});
+
+app.put('/timecards/:id', validateJWT, async (req, res) => {
+  try {
+    const timecard = await db.updateTimecard(req.params.id, req.body, req.userToken);
+    if (!timecard) {
+      return res.status(404).json({ error: 'Timecard not found' });
+    }
+    res.json(timecard);
+  } catch (error) {
+    console.error('Error updating timecard:', error);
+    res.status(500).json({ error: 'Failed to update timecard' });
+  }
+});
+
+app.delete('/timecards/:id', validateJWT, async (req, res) => {
+  try {
+    await db.deleteTimecard(req.params.id, req.userToken);
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting timecard:', error);
+    res.status(500).json({ error: 'Failed to delete timecard' });
+  }
+});
+
+
 app.listen(3000, () => console.log('Server ready on port 3000.'));
 
 module.exports = app;
@@ -379,49 +443,4 @@ module.exports = app;
 
 
 
-// Driver Unavailability routes
-app.get('/driver-unavailability', validateJWT, async (req, res) => {
-  try {
-    const unavailabilities = await db.getAllDriverUnavailabilities(req.userToken);
-    res.json(unavailabilities);
-  } catch (error) {
-    console.error('Error fetching driver unavailabilities:', error);
-    res.status(500).json({ error: 'Failed to fetch driver unavailabilities' });
-  }
-});
 
-app.get('/driver-unavailability/:id', validateJWT, async (req, res) => {
-  try {
-    const unavailability = await db.getDriverUnavailabilityById(req.params.id, req.userToken);
-    if (!unavailability) {
-      return res.status(404).json({ error: 'Driver unavailability not found' });
-    }
-    res.json(unavailability);
-  } catch (error) {
-    console.error('Error fetching driver unavailability:', error);
-    res.status(500).json({ error: 'Failed to fetch driver unavailability' });
-  }
-});
-
-app.put('/driver-unavailability/:id', validateJWT, async (req, res) => {
-  try {
-    const unavailability = await db.updateDriverUnavailability(req.params.id, req.body, req.userToken);
-    if (!unavailability) {
-      return res.status(404).json({ error: 'Driver unavailability not found' });
-    }
-    res.json(unavailability);
-  } catch (error) {
-    console.error('Error updating driver unavailability:', error);
-    res.status(500).json({ error: 'Failed to update driver unavailability' });
-  }
-});
-
-app.delete('/driver-unavailability/:id', validateJWT, async (req, res) => {
-  try {
-    await db.deleteDriverUnavailability(req.params.id, req.userToken);
-    res.status(204).send();
-  } catch (error) {
-    console.error('Error deleting driver unavailability:', error);
-    res.status(500).json({ error: 'Failed to delete driver unavailability' });
-  }
-});
