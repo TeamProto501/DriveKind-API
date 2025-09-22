@@ -323,4 +323,4 @@ module.exports = {
   getStaffProfileById,
   updateStaffProfile,
   deleteStaffProfile
-};
+}; 
