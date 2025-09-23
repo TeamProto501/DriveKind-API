@@ -177,232 +177,174 @@ async function updateTimecard(timecardId, timecardData, userToken) {
   );
 }
 
-
 async function createTimecard(timecardData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('timecards')
-    .insert(timecardData)
-    .select()
-    .single()
+  return handle(
+    client.from("timecards").insert(timecardData).select().single()
   );
 }
 
 async function getAllTimecards(userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('timecards')
-    .select('*')
-  );
+  return handle(client.from("timecards").select("*"));
 }
 
 async function getTimecardById(timecardId, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('timecards')
-    .select('*')
-    .eq('timecard_id', timecardId)
-    .single()
+  return handle(
+    client.from("timecards").select("*").eq("timecard_id", timecardId).single()
   );
 }
 
 async function updateTimecard(timecardId, timecardData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('timecards')
-    .update(timecardData)
-    .eq('timecard_id', timecardId)
-    .select()
-    .single()
+  return handle(
+    client
+      .from("timecards")
+      .update(timecardData)
+      .eq("timecard_id", timecardId)
+      .select()
+      .single()
   );
 }
 
 async function deleteTimecard(timecardId, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('timecards')
-    .delete()
-    .eq('timecard_id', timecardId)
+  return handle(
+    client.from("timecards").delete().eq("timecard_id", timecardId)
   );
 }
 
 // Staff Profiles CRUD operations
 async function createStaffProfile(profileData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('staff_profiles')
-    .insert(profileData)
-    .select()
-    .single()
+  return handle(
+    client.from("staff_profiles").insert(profileData).select().single()
   );
 }
 
 async function getAllStaffProfiles(userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('staff_profiles')
-    .select('*')
-  );
+  return handle(client.from("staff_profiles").select("*"));
 }
 
 async function getStaffProfileById(userId, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('staff_profiles')
-    .select('*')
-    .eq('user_id', userId)
-    .single()
+  return handle(
+    client.from("staff_profiles").select("*").eq("user_id", userId).single()
   );
 }
 
 async function updateStaffProfile(userId, profileData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('staff_profiles')
-    .update(profileData)
-    .eq('user_id', userId)
-    .select()
-    .single()
+  return handle(
+    client
+      .from("staff_profiles")
+      .update(profileData)
+      .eq("user_id", userId)
+      .select()
+      .single()
   );
 }
 
 async function deleteStaffProfile(userId, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('staff_profiles')
-    .delete()
-    .eq('user_id', userId)
-  );
+  return handle(client.from("staff_profiles").delete().eq("user_id", userId));
 }
 
 // Transactions Audit Log operations
 async function createTransactionAuditLog(logData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('transactions_audit_log')
-    .insert(logData)
-    .select()
-    .single()
+  return handle(
+    client.from("transactions_audit_log").insert(logData).select().single()
   );
 }
 
 async function getAllTransactionAuditLogs(userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('transactions_audit_log')
-    .select('*')
-  );
+  return handle(client.from("transactions_audit_log").select("*"));
 }
 
 async function getTransactionAuditLogById(transactionId, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('transactions_audit_log')
-    .select('*')
-    .eq('transaction_id', transactionId)
-    .single()
+  return handle(
+    client
+      .from("transactions_audit_log")
+      .select("*")
+      .eq("transaction_id", transactionId)
+      .single()
   );
 }
 
 // Vehicles CRUD operations
 async function createVehicle(vehicleData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('vehicles')
-    .insert(vehicleData)
-    .select()
-    .single()
-  );
+  return handle(client.from("vehicles").insert(vehicleData).select().single());
 }
 
 async function getAllVehicles(userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('vehicles')
-    .select('*')
-  );
+  return handle(client.from("vehicles").select("*"));
 }
 
 async function getVehicleById(vehicleId, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('vehicles')
-    .select('*')
-    .eq('vehicle_id', vehicleId)
-    .single()
+  return handle(
+    client.from("vehicles").select("*").eq("vehicle_id", vehicleId).single()
   );
 }
 
 async function updateVehicle(vehicleId, vehicleData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('vehicles')
-    .update(vehicleData)
-    .eq('vehicle_id', vehicleId)
-    .select()
-    .single()
+  return handle(
+    client
+      .from("vehicles")
+      .update(vehicleData)
+      .eq("vehicle_id", vehicleId)
+      .select()
+      .single()
   );
 }
 
 async function deleteVehicle(vehicleId, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('vehicles')
-    .delete()
-    .eq('vehicle_id', vehicleId)
-  );
+  return handle(client.from("vehicles").delete().eq("vehicle_id", vehicleId));
 }
 
 // Organization CRUD operations
 async function createOrganization(orgData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('organization')
-    .insert(orgData)
-    .select()
-    .single()
-  );
+  return handle(client.from("organization").insert(orgData).select().single());
 }
 
 async function getAllOrganizations(userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('organization')
-    .select('*')
-  );
+  return handle(client.from("organization").select("*"));
 }
 
 async function getOrganizationById(orgId, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('organization')
-    .select('*')
-    .eq('org_id', orgId)
-    .single()
+  return handle(
+    client.from("organization").select("*").eq("org_id", orgId).single()
   );
 }
 
 async function updateOrganization(orgId, orgData, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('organization')
-    .update(orgData)
-    .eq('org_id', orgId)
-    .select()
-    .single()
+  return handle(
+    client
+      .from("organization")
+      .update(orgData)
+      .eq("org_id", orgId)
+      .select()
+      .single()
   );
 }
 
 async function deleteOrganization(orgId, userToken) {
   const client = getSupabaseClient(userToken);
-  return handle(client
-    .from('organization')
-    .delete()
-    .eq('org_id', orgId)
-  );
+  return handle(client.from("organization").delete().eq("org_id", orgId));
 }
-
-
 
 //initial api call made to load admin dashboard on client table
 async function getClientForAdminDash(userToken) {
@@ -422,8 +364,7 @@ async function getClientForAdminDash(userToken) {
       )
   );
 }
-module.exports = {
- async function deleteDriverUnavailability(id, userToken) {
+async function deleteDriverUnavailability(id, userToken) {
   const client = getSupabaseClient(userToken);
   return handle(client.from("driver_unavailability").delete().eq("id", id));
 }
@@ -494,7 +435,7 @@ async function getClientForAdminDash(userToken) {
       )
   );
 }
- module.exports = {
+module.exports = {
   supabase,
   getSupabaseClient,
   handle,
@@ -518,7 +459,7 @@ async function getClientForAdminDash(userToken) {
   getTimecardById,
   updateTimecard,
   deleteTimecard,
-   createStaffProfile,
+  createStaffProfile,
   getAllStaffProfiles,
   getStaffProfileById,
   updateStaffProfile,
@@ -535,10 +476,9 @@ async function getClientForAdminDash(userToken) {
   getAllOrganizations,
   getOrganizationById,
   updateOrganization,
-  deleteOrganization, 
-   getDriverForAdminDash,
+  deleteOrganization,
+  getDriverForAdminDash,
   getClientForAdminDash,
-};
- 
-  deleteDriverUnavailability
+  getVolunteerForAdminDash,
+  deleteDriverUnavailability,
 };
