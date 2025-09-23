@@ -435,6 +435,31 @@ async function getClientForAdminDash(userToken) {
       )
   );
 }
+
+export async function getRideCandidates(clientId, rideTime) {
+  const { data, error } = await supabase.rpc("get_ride_candidates", {
+    _ride_ts: rideTime,
+    _client_id: clientId,
+    _auto_assign: false
+  });
+  if (error) throw error;
+  return data; // array of matches
+}
+
+export async function assignRideManual(clientId, vehicleId, scheduledTime, pickup, dropoff, dispatcherName, notes = null) {
+  const { data, error } = await supabase.rpc("assign_ride_manual", {
+    _client_id: clientId,
+    _vehicle_id: vehicleId,
+    _scheduled_time: scheduledTime,
+    _pickup_address: pickup,
+    _dropoff_address: dropoff,
+    _dispatcher_name: dispatcherName,
+    _notes: notes
+  });
+  if (error) throw error;
+  return data; // new ride row
+}
+
 module.exports = {
   supabase,
   getSupabaseClient,
@@ -481,4 +506,6 @@ module.exports = {
   getClientForAdminDash,
   getVolunteerForAdminDash,
   deleteDriverUnavailability,
+  getRideCandidates,
+  assignRideManual
 };
