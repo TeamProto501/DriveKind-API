@@ -390,7 +390,7 @@ async function getDriverForAdminDash(userToken) {
         "home_address",
         "city",
         "state",
-        "zipcode",
+        "zip_code",
         "primary_phone"
       )
       .eq("role", "Driver")
@@ -411,7 +411,7 @@ async function getVolunteerForAdminDash(userToken) {
         "home_address",
         "city",
         "state",
-        "zipcode",
+        "zip_code",
         "primary_phone"
       )
       .eq("role", "Volunteer")
@@ -430,7 +430,7 @@ async function getClientForAdminDash(userToken) {
         "street_address",
         "city",
         "state",
-        "zipcode",
+        "zip_code",
         "primary_phone"
       )
   );
