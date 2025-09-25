@@ -346,24 +346,6 @@ async function deleteOrganization(orgId, userToken) {
   return handle(client.from("organization").delete().eq("org_id", orgId));
 }
 
-//initial api call made to load admin dashboard on client table
-async function getClientForAdminDash(userToken) {
-  const client = getSupabaseClient(userToken);
-  return handle(
-    client
-      .from("clients")
-      .select(
-        "first_name",
-        "last_name",
-        "date_of_birth",
-        "street_address",
-        "city",
-        "state",
-        "zipcode",
-        "primary_phone"
-      )
-  );
-}
 async function deleteDriverUnavailability(id, userToken) {
   const client = getSupabaseClient(userToken);
   return handle(client.from("driver_unavailability").delete().eq("id", id));
