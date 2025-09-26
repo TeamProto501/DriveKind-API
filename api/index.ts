@@ -167,7 +167,16 @@ app.get("/clients", validateJWT, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch clients" });
   }
 });
-
+//dashboard loading
+app.get("/clients/dash", validateJWT, async (req, res) => {
+  try {
+    const clients = await db.getClientForAdminDash(req.userToken);
+    res.json(clients);
+  } catch (error) {
+    console.error("Error Fetching clients:", error);
+    res.status(500).json({ error: "Failed to fetch data" });
+  }
+});
 app.get("/clients/:id", validateJWT, async (req, res) => {
   try {
     const client = await db.getClientById(req.params.id, req.userToken);
@@ -745,16 +754,6 @@ app.delete("/organizations/:id", validateJWT, async (req, res) => {
   }
 });
 
-//dashboard loading
-app.get("/clients/dash", validateJWT, async (req, res) => {
-  try {
-    const clients = await db.getClientForAdminDash(req.userToken);
-    res.json(clients);
-  } catch (error) {
-    console.error("Error Fetching clients:", error);
-    res.status(500).json({ error: "Failed to fetch data" });
-  }
-});
 app.get("/volunteer/dash", validateJWT, async (req, res) => {
   try {
     const clients = await db.getVolunteerForAdminDash(req.userToken);
