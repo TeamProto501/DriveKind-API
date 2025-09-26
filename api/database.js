@@ -366,7 +366,7 @@ async function getDriverForAdminDash(userToken) {
       .select(
         "first_name,last_name,role,email,dob,address,city,state,zipcode,primary_phone"
       )
-      .eq("role", "Driver")
+      .eq("role", "['Driver']")
   );
 }
 //initial api call made to load admin dashboard on volunteer table
@@ -378,7 +378,7 @@ async function getVolunteerForAdminDash(userToken) {
       .select(
         "first_name,last_name,role,email,dob,address,city,state,zipcode,primary_phone"
       )
-      .eq("role", "Volunteer")
+      .eq("role", "['Volunteer']")
   );
 }
 //initial api call made to load admin dashboard on client table
@@ -390,6 +390,18 @@ async function getClientForAdminDash(userToken) {
       .select(
         "first_name,last_name,date_of_birth,street_address,city,state,zip_code,primary_phone"
       )
+  );
+}
+//initial api call made to load admin dashboard on volunteer table
+async function getDispatcherForAdminDash(userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(
+    client
+      .from("staff_profiles")
+      .select(
+        "first_name,last_name,role,email,dob,address,city,state,zipcode,primary_phone"
+      )
+      .eq("role", "['Dispatcher']")
   );
 }
 module.exports = {
@@ -438,4 +450,5 @@ module.exports = {
   getClientForAdminDash,
   getVolunteerForAdminDash,
   deleteDriverUnavailability,
+  getDispatcherForAdminDash,
 };
