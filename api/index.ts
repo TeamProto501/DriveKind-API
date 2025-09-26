@@ -759,7 +759,7 @@ app.get("/volunteer/dash", validateJWT, async (req, res) => {
     const clients = await db.getVolunteerForAdminDash(req.userToken);
     res.json(clients);
   } catch (error) {
-    console.error("Error Fetching clients:", error);
+    console.error("Error Fetching volunteer:", error);
     res.status(500).json({ error: "Failed to fetch data" });
   }
 });
@@ -768,7 +768,16 @@ app.get("/driver/dash", validateJWT, async (req, res) => {
     const clients = await db.getDriverForAdminDash(req.userToken);
     res.json(clients);
   } catch (error) {
-    console.error("Error Fetching clients:", error);
+    console.error("Error Fetching driver:", error);
+    res.status(500).json({ error: "Failed to fetch data" });
+  }
+});
+app.get("/dispatcher/dash", validateJWT, async (req, res) => {
+  try {
+    const clients = await db.getDispatcherForAdminDash(req.userToken);
+    res.json(clients);
+  } catch (error) {
+    console.error("Error Fetching dispatchers:", error);
     res.status(500).json({ error: "Failed to fetch data" });
   }
 });
