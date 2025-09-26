@@ -362,7 +362,7 @@ async function getDriverForAdminDash(userToken) {
   const client = getSupabaseClient(userToken);
   return handle(
     client
-      .from("staff_profies")
+      .from("staff_profiles")
       .select(
         "first_name,last_name,role,email,dob,home_address,city,state,zip_code,primary_phone"
       )
@@ -374,7 +374,7 @@ async function getVolunteerForAdminDash(userToken) {
   const client = getSupabaseClient(userToken);
   return handle(
     client
-      .from("staff_profies")
+      .from("staff_profiles")
       .select(
         "first_name,last_name,role,email,dob,home_address,city,state,zip_code,primary_phone"
       )
