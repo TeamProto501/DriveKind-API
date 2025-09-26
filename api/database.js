@@ -364,7 +364,7 @@ async function getDriverForAdminDash(userToken) {
     client
       .from("staff_profiles")
       .select(
-        "first_name,last_name,role,email,dob,home_address,city,state,zip_code,primary_phone"
+        "first_name,last_name,role,email,dob,address,city,state,zipcode,primary_phone"
       )
       .eq("role", "Driver")
   );
@@ -376,7 +376,7 @@ async function getVolunteerForAdminDash(userToken) {
     client
       .from("staff_profiles")
       .select(
-        "first_name,last_name,role,email,dob,home_address,city,state,zip_code,primary_phone"
+        "first_name,last_name,role,email,dob,address,city,state,zipcode,primary_phone"
       )
       .eq("role", "Volunteer")
   );
