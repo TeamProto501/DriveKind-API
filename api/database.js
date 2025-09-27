@@ -366,7 +366,7 @@ async function getDriverForAdminDash(userToken) {
       .select(
         "first_name,last_name,role,email,dob,address,city,state,zipcode,primary_phone"
       )
-      .contains("role", "Driver")
+      .contains("role", ["Driver"])
   );
 }
 //initial api call made to load admin dashboard on volunteer table
