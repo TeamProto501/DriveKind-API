@@ -366,7 +366,7 @@ async function getDriverForAdminDash(userToken) {
       .select(
         "first_name,last_name,role,email,dob,address,city,state,zipcode,primary_phone"
       )
-      .eq("role", "Driver")
+      .contains("role", "Driver")
   );
 }
 //initial api call made to load admin dashboard on volunteer table
@@ -378,7 +378,7 @@ async function getVolunteerForAdminDash(userToken) {
       .select(
         "first_name,last_name,role,email,dob,address,city,state,zipcode,primary_phone"
       )
-      .eq("role", ["Volunteer"])
+      .contains("role", ["Volunteer"])
   );
 }
 //initial api call made to load admin dashboard on client table
@@ -401,7 +401,7 @@ async function getDispatcherForAdminDash(userToken) {
       .select(
         "first_name,last_name,role,email,dob,address,city,state,zipcode,primary_phone"
       )
-      .eq("role", ["Dispatcher"])
+      .contains("role", ["Dispatcher"])
   );
 }
 module.exports = {
