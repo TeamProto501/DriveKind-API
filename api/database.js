@@ -404,6 +404,63 @@ async function getDispatcherForAdminDash(userToken) {
       .contains("role", ["Dispatcher"])
   );
 }
+//audit log that perform inner join with staff profiles
+async function getAuditLogTable(userToken, options = {}) {
+  const client = getSupabaseClient(userToken);
+  const { limit = 100, offset = 0 } = options;
+  return handle(
+    client
+      .from("transactions_audit_log")
+      .select(
+        `
+      transaction_id,
+      action,
+      table_name,
+      timestamp,
+      field_name,
+      old_value,
+      new_value,
+      record_id,
+      staff_profiles!inner(
+        first_name,
+        last_name
+      )
+    `
+      )
+      .order("timestamp", { ascending: false })
+      .range(offset, offset + limit - 1)
+  );
+}
+//formatter for frontend to receive json
+function formatAuditLogData(data) {
+  if (Array.isArray(data)) {
+    return data.map((item) => ({
+      transaction_id: item.transaction_id,
+      action: item.action,
+      table_name: item.table_name,
+      timestamp: item.timestamp,
+      field_name: item.field_name,
+      old_value: item.old_value,
+      new_value: item.new_value,
+      record_id: item.record_id,
+      user_id: item.user_id,
+      name: `${item.staff_profiles.first_name} ${item.staff_profiles.last_name}`,
+    }));
+  } else {
+    return {
+      transaction_id: data.transaction_id,
+      action: data.action,
+      table_name: data.table_name,
+      timestamp: data.timestamp,
+      field_name: data.field_name,
+      old_value: data.old_value,
+      new_value: data.new_value,
+      record_id: data.record_id,
+      user_id: data.user_id,
+      name: `${data.staff_profiles.first_name} ${data.staff_profiles.last_name}`,
+    };
+  }
+}
 module.exports = {
   supabase,
   getSupabaseClient,
@@ -451,4 +508,6 @@ module.exports = {
   getVolunteerForAdminDash,
   deleteDriverUnavailability,
   getDispatcherForAdminDash,
+  getAuditLogTable,
+  formatAuditLogData,
 };
