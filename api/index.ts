@@ -794,7 +794,7 @@ app.get("/audit-log/dash", validateJWT, async (req, res) => {
       console.error("Database query error:", error);
       return res.status(500).json({
         success: false,
-        error: "데이터 조회 중 오류가 발생했습니다.",
+        error: "Error fetching data.",
       });
     }
 
@@ -809,7 +809,7 @@ app.get("/audit-log/dash", validateJWT, async (req, res) => {
     console.error("Server error:", err);
     res.status(500).json({
       success: false,
-      error: "서버 오류가 발생했습니다.",
+      error: "Server error.",
     });
   }
 });
