@@ -782,6 +782,37 @@ app.get("/dispatcher/dash", validateJWT, async (req, res) => {
   }
 });
 
+app.get("/audit-log/dash", validateJWT, async (req, res) => {
+  try {
+    const { limit, offset } = req.query;
+    const [error, result] = await db.getAuditLogTable(req.userToken, {
+      limit,
+      offset,
+    });
+
+    if (error) {
+      console.error("Database query error:", error);
+      return res.status(500).json({
+        success: false,
+        error: "데이터 조회 중 오류가 발생했습니다.",
+      });
+    }
+
+    const formattedData = db.formatAuditLogData(result.data);
+
+    res.json({
+      success: true,
+      data: formattedData,
+      count: formattedData.length,
+    });
+  } catch (err) {
+    console.error("Server error:", err);
+    res.status(500).json({
+      success: false,
+      error: "서버 오류가 발생했습니다.",
+    });
+  }
+});
 app.listen(3000, () => console.log("Server ready on port 3000."));
 
 module.exports = app;
