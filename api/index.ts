@@ -519,11 +519,12 @@ app.delete("/timecards/:id", validateJWT, async (req, res) => {
 });
 
 // Staff Profiles routes
-app.post("/staff-profiles", validateJWTWithOrg, async (req, res) => {
+app.post("/staff-profiles", validateJWT, async (req, res) => {
   try {
     const profileData = {
       ...req.body,
-      org_id: req.user.org_id,
+      // org_id should come from request body since we're creating the profile
+      org_id: req.body.org_id || 1, // Use provided org_id or default to 1
     };
     const profile = await db.createStaffProfile(profileData, req.userToken);
     res.status(201).json(profile);
