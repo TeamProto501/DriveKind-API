@@ -4,6 +4,7 @@ const express = require("express");
 const app = express();
 const { sql } = require("@vercel/postgres");
 const db = require("./database.js");
+const { createClient } = require("@supabase/supabase-js");
 const { createServerClient } = require("@supabase/ssr");
 const cors = require("cors");
 
@@ -13,15 +14,26 @@ const session = require("express-session");
 const cookieParser = require("cookie-parser");
 const { v4: uuidv4 } = require("uuid");
 
-// Initialize single Supabase client instance
+// Initialize Supabase clients
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Regular Supabase client
 const supabase = createServerClient(supabaseUrl, supabaseKey, {
   cookies: {
     get: () => null,
     set: () => {},
     remove: () => {},
   },
+});
+
+// Admin Supabase client with service role key
+const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
 });
 
 // Create application/x-www-form-urlencoded parser
@@ -142,6 +154,37 @@ const validateOrgAccess = async (req, res, next) => {
 // Combined middleware for JWT + Org validation
 const validateJWTWithOrg = [validateJWT, validateOrgAccess];
 
+// Admin Auth User Creation Endpoint
+app.post("/admin/create-auth-user", validateJWT, async (req, res) => {
+  try {
+    const { email, password, first_name, last_name } = req.body;
+    
+    console.log('Creating auth user for:', email);
+    
+    // Use admin client with service role key
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        first_name,
+        last_name
+      }
+    });
+
+    if (error) {
+      console.error('Auth creation error:', error);
+      return res.status(400).json({ error: error.message });
+    }
+
+    console.log('Auth user created successfully:', data.user.id);
+    res.json({ user_id: data.user.id });
+  } catch (error) {
+    console.error("Error creating auth user:", error);
+    res.status(500).json({ error: "Failed to create auth user" });
+  }
+});
+
 // Client routes
 app.post("/clients", validateJWTWithOrg, async (req, res) => {
   try {
@@ -167,6 +210,7 @@ app.get("/clients", validateJWT, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch clients" });
   }
 });
+
 //dashboard loading
 app.get("/clients/dash", validateJWT, async (req, res) => {
   try {
@@ -177,6 +221,7 @@ app.get("/clients/dash", validateJWT, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch data" });
   }
 });
+
 app.get("/clients/:id", validateJWT, async (req, res) => {
   try {
     const client = await db.getClientById(req.params.id, req.userToken);
@@ -383,72 +428,6 @@ app.delete("/calls/:id", validateJWT, async (req, res) => {
   } catch (error) {
     console.error("Error deleting call:", error);
     res.status(500).json({ error: "Failed to delete call" });
-  }
-});
-
-// Timecards routes
-app.post("/timecards", validateJWTWithOrg, async (req, res) => {
-  try {
-    const timecardData = {
-      ...req.body,
-      org_id: req.user.org_id,
-      user_id: req.user.id,
-    };
-    const timecard = await db.createTimecard(timecardData, req.userToken);
-    res.status(201).json(timecard);
-  } catch (error) {
-    console.error("Error creating timecard:", error);
-    res.status(500).json({ error: "Failed to create timecard" });
-  }
-});
-
-app.get("/timecards", validateJWT, async (req, res) => {
-  try {
-    const timecards = await db.getAllTimecards(req.userToken);
-    res.json(timecards);
-  } catch (error) {
-    console.error("Error fetching timecards:", error);
-    res.status(500).json({ error: "Failed to fetch timecards" });
-  }
-});
-
-app.get("/timecards/:id", validateJWT, async (req, res) => {
-  try {
-    const timecard = await db.getTimecardById(req.params.id, req.userToken);
-    if (!timecard) {
-      return res.status(404).json({ error: "Timecard not found" });
-    }
-    res.json(timecard);
-  } catch (error) {
-    console.error("Error fetching timecard:", error);
-    res.status(500).json({ error: "Failed to fetch timecard" });
-  }
-});
-
-app.put("/timecards/:id", validateJWT, async (req, res) => {
-  try {
-    const timecard = await db.updateTimecard(
-      req.params.id,
-      req.body,
-      req.userToken
-    );
-    if (!timecard) {
-      return res.status(404).json({ error: "Timecard not found" });
-    }
-    res.json(timecard);
-  } catch (error) {
-    console.error("Error updating timecard:", error);
-    res.status(500).json({ error: "Failed to update timecard" });
-  }
-});
-
-app.delete("/timecards/:id", validateJWT, async (req, res) => {
-  try {
-    await db.deleteTimecard(req.params.id, req.userToken);
-    res.status(204).send();
-  } catch (error) {
-    console.error("Error deleting timecard:", error);
-    res.status(500).json({ error: "Failed to delete timecard" });
   }
 });
 
@@ -764,6 +743,7 @@ app.get("/volunteer/dash", validateJWT, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch data" });
   }
 });
+
 app.get("/driver/dash", validateJWT, async (req, res) => {
   try {
     const clients = await db.getDriverForAdminDash(req.userToken);
@@ -773,6 +753,7 @@ app.get("/driver/dash", validateJWT, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch data" });
   }
 });
+
 app.get("/dispatcher/dash", validateJWT, async (req, res) => {
   try {
     const clients = await db.getDispatcherForAdminDash(req.userToken);
@@ -814,6 +795,7 @@ app.get("/audit-log/dash", validateJWT, async (req, res) => {
     });
   }
 });
+
 app.listen(3000, () => console.log("Server ready on port 3000."));
 
 module.exports = app;
