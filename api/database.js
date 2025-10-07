@@ -405,14 +405,11 @@ async function getDispatcherForAdminDash(userToken) {
   );
 }
 //audit log that perform inner join with staff profiles
-async function getAuditLogTable(userToken, options = {}) {
-  const client = getSupabaseClient(userToken);
-  const { limit = 100, offset = 0 } = options;
-  return handle(
-    client
-      .from("transactions_audit_log")
-      .select(
-        `
+async function getAuditLogTable(userToken, { limit, offset }) {
+  const query = supabase
+    .from("transactions_audit_log")
+    .select(
+      `
       transaction_id,
       action_enum,
       table_name_enum,
@@ -420,43 +417,39 @@ async function getAuditLogTable(userToken, options = {}) {
       field_name,
       old_value,
       new_value,
-      staff_profiles!inner(
-        first_name,
-        last_name
-      )
+      staff_profiles(first_name, last_name)
     `
-      )
-      .order("timestamp", { ascending: false })
-      .range(offset, offset + limit - 1)
-  );
+    )
+    .limit(limit)
+    .offset(offset);
 }
 //formatter for frontend to receive json
 function formatAuditLogData(data) {
   if (Array.isArray(data)) {
     return data.map((item) => ({
       transaction_id: item.transaction_id,
-      action: item.action,
-      table_name: item.table_name,
+      action: item.action_enum,
+      table_name: item.table_name_enum,
       timestamp: item.timestamp,
       field_name: item.field_name,
       old_value: item.old_value,
       new_value: item.new_value,
-      record_id: item.record_id,
-      user_id: item.user_id,
-      name: `${item.staff_profiles.first_name} ${item.staff_profiles.last_name}`,
+      name: `${item.staff_profiles?.first_name || ""} ${
+        item.staff_profiles?.last_name || ""
+      }`.trim(),
     }));
   } else {
     return {
       transaction_id: data.transaction_id,
-      action: data.action,
-      table_name: data.table_name,
+      action: data.action_enum,
+      table_name: data.table_name_enum,
       timestamp: data.timestamp,
       field_name: data.field_name,
       old_value: data.old_value,
       new_value: data.new_value,
-      record_id: data.record_id,
-      user_id: data.user_id,
-      name: `${data.staff_profiles.first_name} ${data.staff_profiles.last_name}`,
+      name: `${data.staff_profiles?.first_name || ""} ${
+        data.staff_profiles?.last_name || ""
+      }`.trim(),
     };
   }
 }
