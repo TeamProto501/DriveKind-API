@@ -414,13 +414,12 @@ async function getAuditLogTable(userToken, options = {}) {
       .select(
         `
       transaction_id,
-      action,
-      table_name,
+      action_enum,
+      table_name_enum,
       timestamp,
       field_name,
       old_value,
       new_value,
-      record_id,
       staff_profiles!inner(
         first_name,
         last_name
