@@ -32,8 +32,8 @@ const supabase = createServerClient(supabaseUrl, supabaseKey, {
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
     autoRefreshToken: false,
-    persistSession: false
-  }
+    persistSession: false,
+  },
 });
 
 // Create application/x-www-form-urlencoded parser
@@ -158,9 +158,9 @@ const validateJWTWithOrg = [validateJWT, validateOrgAccess];
 app.post("/admin/create-auth-user", validateJWT, async (req, res) => {
   try {
     const { email, password, first_name, last_name } = req.body;
-    
-    console.log('Creating auth user for:', email);
-    
+
+    console.log("Creating auth user for:", email);
+
     // Use admin client with service role key
     const { data, error } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -168,16 +168,16 @@ app.post("/admin/create-auth-user", validateJWT, async (req, res) => {
       email_confirm: true,
       user_metadata: {
         first_name,
-        last_name
-      }
+        last_name,
+      },
     });
 
     if (error) {
-      console.error('Auth creation error:', error);
+      console.error("Auth creation error:", error);
       return res.status(400).json({ error: error.message });
     }
 
-    console.log('Auth user created successfully:', data.user.id);
+    console.log("Auth user created successfully:", data.user.id);
     res.json({ user_id: data.user.id });
   } catch (error) {
     console.error("Error creating auth user:", error);
@@ -766,12 +766,7 @@ app.get("/dispatcher/dash", validateJWT, async (req, res) => {
 
 app.get("/audit-log/dash", validateJWT, async (req, res) => {
   try {
-    const { limit, offset } = req.query;
-    const [error, result] = await db.getAuditLogTable(req.userToken, {
-      limit,
-      offset,
-    });
-
+    const [error, result] = await db.getAuditLogTable(req.userToken);
     if (error) {
       console.error("Database query error:", error);
       return res.status(500).json({
@@ -779,9 +774,7 @@ app.get("/audit-log/dash", validateJWT, async (req, res) => {
         error: "Error fetching data.",
       });
     }
-
     const formattedData = db.formatAuditLogData(result.data);
-
     res.json({
       success: true,
       data: formattedData,
