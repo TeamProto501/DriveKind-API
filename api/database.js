@@ -406,19 +406,29 @@ async function getDispatcherForAdminDash(userToken) {
 }
 //audit log that perform inner join with staff profiles
 async function getAuditLogTable(userToken) {
-  const query = supabase.from("transactions_audit_log").select(
-    `
-      transaction_id,
-      action_enum,
-      table_name_enum,
-      timestamp,
-      field_name,
-      old_value,
-      new_value,
-      staff_profiles(first_name, last_name)
-    `
-  );
+  try {
+    const { data, error } = await supabase.from("transactions_audit_log")
+      .select(`
+        transaction_id,
+        action_enum,
+        table_name_enum,
+        timestamp,
+        field_name,
+        old_value,
+        new_value,
+        staff_profiles(first_name, last_name)
+      `);
+
+    if (error) {
+      return [error, null];
+    }
+
+    return [null, { data }];
+  } catch (err) {
+    return [err, null];
+  }
 }
+
 //formatter for frontend to receive json
 function formatAuditLogData(data) {
   if (Array.isArray(data)) {
