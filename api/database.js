@@ -449,6 +449,47 @@ function formatAuditLogData(data) {
     };
   }
 }
+
+async function getCallTableForLog(userToken) {
+  const client = getSupabaseClient(userToken);
+  const result = await handle(
+    client.from("calls").select(`
+        call_time,
+        call_type,
+        other_type,
+        phone_number,
+        forwarded_to_name,
+        forwarded_to_date,
+        caller_first_name,
+        caller_last_name,
+        staff_profile:user_id (
+          first_name,
+          last_name
+        )
+      `)
+  );
+  if (result.data) {
+    result.data = result.data.map((call) => ({
+      call_time: call.call_time,
+      call_type: call.call_type,
+      other_type: call.other_type,
+      phone_number: call.phone_number,
+      forwarded_to_name: call.forwarded_to_name,
+      forwarded_to_date: call.forwarded_to_date,
+      staff_name: call.staff_profile
+        ? `${call.staff_profile.first_name} ${call.staff_profile.last_name}`.trim()
+        : null,
+      caller_name:
+        call.caller_first_name || call.caller_last_name
+          ? `${call.caller_first_name || ""} ${
+              call.caller_last_name || ""
+            }`.trim()
+          : null,
+    }));
+  }
+
+  return result;
+}
 module.exports = {
   supabase,
   getSupabaseClient,
@@ -498,4 +539,5 @@ module.exports = {
   getDispatcherForAdminDash,
   getAuditLogTable,
   formatAuditLogData,
+  getCallTableForLog,
 };
