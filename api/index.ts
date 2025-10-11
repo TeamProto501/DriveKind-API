@@ -764,7 +764,7 @@ app.get("/dispatcher/dash", validateJWT, async (req, res) => {
   }
 });
 
-app.get("/logs/audit", validateJWT, async (req, res) => {
+app.get("/audit-log/dash", validateJWT, async (req, res) => {
   try {
     const [error, result] = await db.getAuditLogTable(req.userToken);
     if (error) {
@@ -788,7 +788,7 @@ app.get("/logs/audit", validateJWT, async (req, res) => {
     });
   }
 });
-app.get("/logs/calls", validateJWT, async (req, res) => {
+app.get("/log/calls", validateJWT, async (req, res) => {
   try {
     const clients = await db.getCallTableForLog(req.userToken);
     res.json(clients);
