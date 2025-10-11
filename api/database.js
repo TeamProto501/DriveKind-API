@@ -452,7 +452,7 @@ function formatAuditLogData(data) {
 
 async function getCallTableForLog(userToken) {
   const client = getSupabaseClient(userToken);
-  const result = await handle(
+  const data = await handle(
     client.from("calls").select(`
         call_time,
         call_type,
