@@ -468,8 +468,8 @@ async function getCallTableForLog(userToken) {
         )
       `)
   );
-  if (result.data) {
-    result.data = result.data.map((call) => ({
+  if (data) {
+    return data.map((call) => ({
       call_time: call.call_time,
       call_type: call.call_type,
       other_type: call.other_type,
@@ -488,7 +488,7 @@ async function getCallTableForLog(userToken) {
     }));
   }
 
-  return result;
+  return data;
 }
 module.exports = {
   supabase,
