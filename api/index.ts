@@ -788,7 +788,15 @@ app.get("/audit-log/dash", validateJWT, async (req, res) => {
     });
   }
 });
-
+app.get("/log/calls", validateJWT, async (req, res) => {
+  try {
+    const clients = await db.getCallTableForLog(req.userToken);
+    res.json(clients);
+  } catch (error) {
+    console.error("Error Fetching dispatchers:", error);
+    res.status(500).json({ error: "Failed to fetch data" });
+  }
+});
 app.listen(3000, () => console.log("Server ready on port 3000."));
 
 module.exports = app;
