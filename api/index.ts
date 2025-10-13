@@ -369,6 +369,52 @@ app.delete("/rides/:ride_id", validateJWT, async (req, res) => {
   }
 });
 
+// Assign driver to ride
+app.post("/rides/:ride_id/assign", validateJWT, async (req, res) => {
+  try {
+    const { driver_user_id } = req.body;
+    const rideId = req.params.ride_id;
+
+    console.log('Assigning driver:', driver_user_id, 'to ride:', rideId);
+
+    if (!driver_user_id) {
+      return res.status(400).json({ error: 'driver_user_id is required' });
+    }
+
+    // Get the driver's active vehicle (optional)
+    const { data: vehicle } = await supabase
+      .from('vehicles')
+      .select('vehicle_id')
+      .eq('user_id', driver_user_id)
+      .eq('driver_status', 'active')
+      .limit(1)
+      .maybeSingle();
+
+    console.log('Found vehicle:', vehicle);
+
+    // Update the ride with driver assignment
+    const ride = await db.updateRide(
+      rideId,
+      {
+        driver_user_id: driver_user_id,
+        vehicle_id: vehicle?.vehicle_id || null,
+        status: 'Assigned'
+      },
+      req.userToken
+    );
+
+    if (!ride) {
+      return res.status(404).json({ error: 'Ride not found' });
+    }
+
+    console.log('Driver assigned successfully');
+    res.json({ success: true, ride });
+  } catch (error) {
+    console.error('Error assigning driver:', error);
+    res.status(500).json({ error: 'Failed to assign driver' });
+  }
+});
+
 // Calls routes
 app.post("/calls", validateJWTWithOrg, async (req, res) => {
   try {
