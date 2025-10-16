@@ -843,7 +843,7 @@ app.get("/log/calls", validateJWT, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch data" });
   }
 });
-app.delete("/log/deleteByTime", validateJWT, async (req, res) => {
+app.post("/log/deleteByTime", validateJWT, async (req, res) => {
   try {
     const { startTime, endTime } = req.body;
     if (!startTime || !endTime) {
@@ -860,7 +860,6 @@ app.delete("/log/deleteByTime", validateJWT, async (req, res) => {
       });
     }
 
-    // 날짜 유효성 검증
     const start = new Date(startTime);
     const end = new Date(endTime);
 
