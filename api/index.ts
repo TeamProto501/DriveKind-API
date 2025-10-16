@@ -375,22 +375,22 @@ app.post("/rides/:ride_id/assign", validateJWT, async (req, res) => {
     const { driver_user_id } = req.body;
     const rideId = req.params.ride_id;
 
-    console.log('Assigning driver:', driver_user_id, 'to ride:', rideId);
+    console.log("Assigning driver:", driver_user_id, "to ride:", rideId);
 
     if (!driver_user_id) {
-      return res.status(400).json({ error: 'driver_user_id is required' });
+      return res.status(400).json({ error: "driver_user_id is required" });
     }
 
     // Get the driver's active vehicle (optional)
     const { data: vehicle } = await supabase
-      .from('vehicles')
-      .select('vehicle_id')
-      .eq('user_id', driver_user_id)
-      .eq('driver_status', 'active')
+      .from("vehicles")
+      .select("vehicle_id")
+      .eq("user_id", driver_user_id)
+      .eq("driver_status", "active")
       .limit(1)
       .maybeSingle();
 
-    console.log('Found vehicle:', vehicle);
+    console.log("Found vehicle:", vehicle);
 
     // Update the ride with driver assignment
     const ride = await db.updateRide(
@@ -398,20 +398,20 @@ app.post("/rides/:ride_id/assign", validateJWT, async (req, res) => {
       {
         driver_user_id: driver_user_id,
         vehicle_id: vehicle?.vehicle_id || null,
-        status: 'Assigned'
+        status: "Assigned",
       },
       req.userToken
     );
 
     if (!ride) {
-      return res.status(404).json({ error: 'Ride not found' });
+      return res.status(404).json({ error: "Ride not found" });
     }
 
-    console.log('Driver assigned successfully');
+    console.log("Driver assigned successfully");
     res.json({ success: true, ride });
   } catch (error) {
-    console.error('Error assigning driver:', error);
-    res.status(500).json({ error: 'Failed to assign driver' });
+    console.error("Error assigning driver:", error);
+    res.status(500).json({ error: "Failed to assign driver" });
   }
 });
 
@@ -843,6 +843,53 @@ app.get("/log/calls", validateJWT, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch data" });
   }
 });
+app.delete("/log/deleteByTime", validateJWT, async (req, res) => {
+  try {
+    const { startTime, endTime } = req.body;
+    if (!startTime || !endTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide Start Time and End Time",
+      });
+    }
+
+    if (!req.userToken) {
+      return res.status(401).json({
+        success: false,
+        message: "Need Authorization Token.",
+      });
+    }
+
+    // 날짜 유효성 검증
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid type of Date.",
+      });
+    }
+
+    if (start >= end) {
+      return res.status(400).json({
+        success: false,
+        message: "Start Time must be before End Time.",
+      });
+    }
+
+    const result = await db.deleteLogsByTimeRange(
+      req.userToken,
+      startTime,
+      endTime
+    );
+    res.json(result);
+  } catch (error) {
+    console.error("Error Fetching dispatchers:", error);
+    res.status(500).json({ error: "Failed to fetch data" });
+  }
+});
+
 app.listen(3000, () => console.log("Server ready on port 3000."));
 
 module.exports = app;

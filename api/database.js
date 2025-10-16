@@ -500,6 +500,17 @@ async function getCallTableForLog(userToken) {
 
   return data;
 }
+
+async function deleteLogsByTimeRange(startTime, endTime, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(
+    client
+      .from("transactions_audit_log")
+      .delete()
+      .gte("timestamp", startTime)
+      .lte("timestamp", endTime)
+  );
+}
 module.exports = {
   supabase,
   getSupabaseClient,
@@ -550,4 +561,5 @@ module.exports = {
   getAuditLogTable,
   formatAuditLogData,
   getCallTableForLog,
+  deleteLogsByTimeRange,
 };
