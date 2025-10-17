@@ -518,7 +518,7 @@ async function previewLogsByTimeRange(userToken, startTime, endTime) {
     client
       .from("transactions_audit_log")
       .select(
-        "transaction_id,staff_profiles:user_id(first_name, last_name),timestamp,field_name,old_value,new_value,action_enum,tablename_enum"
+        "transaction_id,staff_profiles:user_id(first_name, last_name),timestamp,field_name,old_value,new_value,action_enum,table_name_enum"
       )
       .gte("timestamp", startTime)
       .lte("timestamp", endTime)
