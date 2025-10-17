@@ -501,12 +501,25 @@ async function getCallTableForLog(userToken) {
   return data;
 }
 
-async function deleteLogsByTimeRange(startTime, endTime, userToken) {
+async function deleteLogsByTimeRange(userToken, startTime, endTime) {
   const client = getSupabaseClient(userToken);
   return handle(
     client
       .from("transactions_audit_log")
       .delete()
+      .gte("timestamp", startTime)
+      .lte("timestamp", endTime)
+  );
+}
+
+async function previewLogsByTimeRange(userToken, startTime, endTime) {
+  const client = getSupabaseClient(userToken);
+  return handle(
+    client
+      .from("transactions_audit_log")
+      .select(
+        "transactions_id,staff_profiles:user_id(first_name, last_name),timestamp,field_name,old_value,new_value,action_enum,tablename_enum"
+      )
       .gte("timestamp", startTime)
       .lte("timestamp", endTime)
   );
@@ -562,4 +575,5 @@ module.exports = {
   formatAuditLogData,
   getCallTableForLog,
   deleteLogsByTimeRange,
+  previewLogsByTimeRange,
 };
