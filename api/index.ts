@@ -889,6 +889,52 @@ app.post("/log/deleteByTime", validateJWT, async (req, res) => {
   }
 });
 
+app.post("log/previewByTime", validateJWT, async (req, res) => {
+  try {
+    const { startTime, endTime } = req.body;
+    if (!startTime || !endTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide Start Time and End Time",
+      });
+    }
+
+    if (!req.userToken) {
+      return res.status(401).json({
+        success: false,
+        message: "Need Authorization Token.",
+      });
+    }
+
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid type of Date.",
+      });
+    }
+
+    if (start >= end) {
+      return res.status(400).json({
+        success: false,
+        message: "Start Time must be before End Time.",
+      });
+    }
+
+    const result = await db.previewLogsByTimeRange(
+      req.userToken,
+      startTime,
+      endTime
+    );
+    res.json(result);
+  } catch (error) {
+    console.error("Error Fetching dispatchers:", error);
+    res.status(500).json({ error: "Failed to fetch data" });
+  }
+});
+
 app.listen(3000, () => console.log("Server ready on port 3000."));
 
 module.exports = app;
