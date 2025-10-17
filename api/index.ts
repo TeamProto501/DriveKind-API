@@ -889,7 +889,7 @@ app.post("/log/deleteByTime", validateJWT, async (req, res) => {
   }
 });
 
-app.post("log/previewByTime", validateJWT, async (req, res) => {
+app.post("/log/previewByTime", validateJWT, async (req, res) => {
   try {
     const { startTime, endTime } = req.body;
     if (!startTime || !endTime) {
