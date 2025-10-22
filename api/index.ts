@@ -601,7 +601,20 @@ app.put("/staff-profiles/:id", validateJWT, async (req, res) => {
 
 app.delete("/staff-profiles/:id", validateJWT, async (req, res) => {
   try {
-    await db.deleteStaffProfile(req.params.id, req.userToken);
+    const userId = req.params.id;
+    
+    // First delete the staff profile from the database
+    await db.deleteStaffProfile(userId, req.userToken);
+    
+    // Then delete the auth user using admin client
+    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    
+    if (authError) {
+      console.error("Error deleting auth user:", authError);
+      // Note: Staff profile is already deleted, so we still return success
+      // but log the error for investigation
+    }
+    
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting staff profile:", error);
