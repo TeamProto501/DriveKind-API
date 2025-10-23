@@ -304,7 +304,7 @@ app.get("/driver-unavailability/:id", validateJWT, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch driver unavailability" });
   }
 });
-app.get("/driver-unavailability/uid", validateJWT, async (req, res) => {
+app.get("/driver-unavailability/by-user", validateJWT, async (req, res) => {
   try {
     const unavailability = await db.getDriverUnavailabilityByUId(
       req.user.id,
