@@ -280,7 +280,7 @@ app.post("/driver-unavailability", validateJWT, async (req, res) => {
   };
   try {
     const unavailabilities = await db.createDriverUnavailability(
-      req.unavailabilityData,
+      unavailabilityData,
       req.userToken
     );
     res.status(201).json(unavailabilities);
