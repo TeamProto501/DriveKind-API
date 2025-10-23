@@ -152,6 +152,13 @@ async function getDriverUnavailabilityById(id, userToken) {
   const client = getSupabaseClient(userToken);
   return handle(client.from("driver_unavailability").select("*").eq("id", id));
 }
+
+async function getDriverUnavailabilityByUId(id, userToken) {
+  const client = getSupabaseClient(userToken);
+  return handle(
+    client.from("driver_unavailability").select("*").eq("user_id", id)
+  );
+}
 async function getTimecardById(timecardId, userToken) {
   const client = getSupabaseClient(userToken);
   return handle(
@@ -576,4 +583,5 @@ module.exports = {
   getCallTableForLog,
   deleteLogsByTimeRange,
   previewLogsByTimeRange,
+  getDriverUnavailabilityByUId,
 };
