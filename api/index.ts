@@ -128,7 +128,7 @@ const validateOrgAccess = async (req, res, next) => {
     const { data: profile, error } = await supabase
       .from("staff_profiles")
       .select("org_id")
-      .eq("auth_user_id", req.user.id)
+      .eq("user_id", req.user.id)
       .single();
 
     if (error || !profile) {
