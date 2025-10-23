@@ -191,7 +191,6 @@ app.post("/clients", validateJWTWithOrg, async (req, res) => {
     const clientData = {
       ...req.body,
       org_id: req.user.org_id,
-      user_id: req.user.id,
     };
     const client = await db.createClient(clientData, req.userToken);
     res.status(201).json(client);
