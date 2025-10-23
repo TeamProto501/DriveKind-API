@@ -274,12 +274,16 @@ app.get("/driver-unavailability", validateJWT, async (req, res) => {
   }
 });
 app.post("/driver-unavailability", validateJWT, async (req, res) => {
+  const unavailabilityData = {
+    ...req.body,
+    user_id: req.user.id,
+  };
   try {
     const unavailabilities = await db.createDriverUnavailability(
       req.unavailabilityData,
       req.userToken
     );
-    res.json(unavailabilities);
+    res.status(201).json(unavailabilities);
   } catch (err) {
     console.error("Error creating driver unavailabilities:", err);
     res.status(500).json({ error: "Failed to create driver unavailabilities" });
