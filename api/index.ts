@@ -289,10 +289,10 @@ app.post("/driver-unavailability", validateJWT, async (req, res) => {
     res.status(500).json({ error: "Failed to create driver unavailabilities" });
   }
 });
-app.get("/driver-unavailability/:id", validateJWT, async (req, res) => {
+app.get("/driver-unavailability/by-user", validateJWT, async (req, res) => {
   try {
-    const unavailability = await db.getDriverUnavailabilityById(
-      req.params.id,
+    const unavailability = await db.getDriverUnavailabilityByUId(
+      req.user.id,
       req.userToken
     );
     if (!unavailability) {
@@ -304,10 +304,10 @@ app.get("/driver-unavailability/:id", validateJWT, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch driver unavailability" });
   }
 });
-app.get("/driver-unavailability/by-user", validateJWT, async (req, res) => {
+app.get("/driver-unavailability/:id", validateJWT, async (req, res) => {
   try {
-    const unavailability = await db.getDriverUnavailabilityByUId(
-      req.user.id,
+    const unavailability = await db.getDriverUnavailabilityById(
+      req.params.id,
       req.userToken
     );
     if (!unavailability) {
