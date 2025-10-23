@@ -126,7 +126,7 @@ const validateOrgAccess = async (req, res, next) => {
 
     // Get user's organization from profiles table (still needed for inserts)
     const { data: profile, error } = await supabase
-      .from("profiles")
+      .from("staff_profiles")
       .select("org_id")
       .eq("auth_user_id", req.user.id)
       .single();
