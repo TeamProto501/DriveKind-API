@@ -273,7 +273,18 @@ app.get("/driver-unavailability", validateJWT, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch driver unavailabilities" });
   }
 });
-
+app.post("/driver-unavailability", validateJWT, async (req, res) => {
+  try {
+    const unavailabilities = await db.createDriverUnavailability(
+      req.unavailabilityData,
+      req.userToken
+    );
+    res.json(unavailabilities);
+  } catch (err) {
+    console.error("Error creating driver unavailabilities:", err);
+    res.status(500).json({ error: "Failed to create driver unavailabilities" });
+  }
+});
 app.get("/driver-unavailability/:id", validateJWT, async (req, res) => {
   try {
     const unavailability = await db.getDriverUnavailabilityById(
@@ -601,19 +612,21 @@ app.put("/staff-profiles/:id", validateJWT, async (req, res) => {
 app.delete("/staff-profiles/:id", validateJWT, async (req, res) => {
   try {
     const userId = req.params.id;
-    
+
     // First delete the staff profile from the database
     await db.deleteStaffProfile(userId, req.userToken);
-    
+
     // Then delete the auth user using admin client
-    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-    
+    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(
+      userId
+    );
+
     if (authError) {
       console.error("Error deleting auth user:", authError);
       // Note: Staff profile is already deleted, so we still return success
       // but log the error for investigation
     }
-    
+
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting staff profile:", error);
