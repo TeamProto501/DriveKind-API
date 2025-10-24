@@ -46,6 +46,8 @@ app.use(
       "http://localhost:5173",
       "http://localhost:3000",
       "https://guaranteeth-slides.vercel.app",
+      "https://drivekind.info",
+      "https://www.drivekind.info",
       /^https:\/\/.*\.vercel\.app$/,
     ],
     credentials: true,
