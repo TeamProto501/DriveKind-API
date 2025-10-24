@@ -531,6 +531,37 @@ async function previewLogsByTimeRange(userToken, startTime, endTime) {
       .lte("timestamp", endTime)
   );
 }
+
+async function getDriverRideStats(userId, startDate, endDate, userToken) {
+  const client = getSupabaseClient(userToken);
+  
+  const { data: rides, error } = await client
+    .from("rides")
+    .select("ride_id, status, pickup_date")
+    .eq("driver_user_id", userId)
+    .gte("pickup_date", startDate)
+    .lte("pickup_date", endDate);
+
+  if (error) {
+    console.error("Error fetching rides:", error);
+    throw new Error(`Database error: ${error.message}`);
+  }
+
+  const scheduledRides = rides.filter(r => 
+    r.status === 'Scheduled' || r.status === 'Assigned'
+  ).length;
+  
+  const completedRides = rides.filter(r => 
+    r.status === 'Completed'
+  ).length;
+
+  return {
+    scheduled: scheduledRides,
+    completed: completedRides,
+    total: rides.length
+  };
+}
+
 module.exports = {
   supabase,
   getSupabaseClient,
@@ -584,4 +615,5 @@ module.exports = {
   deleteLogsByTimeRange,
   previewLogsByTimeRange,
   getDriverUnavailabilityByUId,
+  getDriverRideStats,
 };

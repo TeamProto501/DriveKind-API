@@ -981,6 +981,28 @@ app.post("/log/previewByTime", validateJWT, async (req, res) => {
   }
 });
 
+app.get("/reports/rides/stats", validateJWT, async (req, res) => {
+  try {
+    const { start_date, end_date } = req.query;
+    
+    if (!start_date || !end_date) {
+      return res.status(400).json({ error: "start_date and end_date are required" });
+    }
+
+    const stats = await db.getDriverRideStats(
+      req.user.id,
+      start_date,
+      end_date,
+      req.userToken
+    );
+    
+    res.json(stats);
+  } catch (error) {
+    console.error("Error fetching ride stats:", error);
+    res.status(500).json({ error: "Failed to fetch ride statistics" });
+  }
+});
+
 app.listen(3000, () => console.log("Server ready on port 3000."));
 
 module.exports = app;
