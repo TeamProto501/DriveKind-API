@@ -760,7 +760,14 @@ app.delete("/vehicles/:id", validateJWT, async (req, res) => {
 // Organization routes
 app.post("/organizations", validateJWT, async (req, res) => {
   try {
-    const organization = await db.createOrganization(req.body, req.userToken);
+    /* const organization = await db.createOrganization(req.body, req.userToken); */
+    const organization = await AuditLogger.auditCreate({
+      tableName: "organizations",
+      data: req.body,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     res.status(201).json(organization);
   } catch (error) {
     console.error("Error creating organization:", error);
@@ -796,11 +803,19 @@ app.get("/organizations/:id", validateJWT, async (req, res) => {
 
 app.put("/organizations/:id", validateJWT, async (req, res) => {
   try {
-    const organization = await db.updateOrganization(
+    /* const organization = await db.updateOrganization(
       req.params.id,
       req.body,
       req.userToken
-    );
+    ); */
+    const organization = await AuditLogger.auditUpdate({
+      tableName: "organizations",
+      id: req.params.id,
+      updates: req.body,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     if (!organization) {
       return res.status(404).json({ error: "Organization not found" });
     }
@@ -813,7 +828,14 @@ app.put("/organizations/:id", validateJWT, async (req, res) => {
 
 app.delete("/organizations/:id", validateJWT, async (req, res) => {
   try {
-    await db.deleteOrganization(req.params.id, req.userToken);
+    /* await db.deleteOrganization(req.params.id, req.userToken); */
+    await AuditLogger.auditDelete({
+      tableName: "organizations",
+      id: req.params.id,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting organization:", error);
