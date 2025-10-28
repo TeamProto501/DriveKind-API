@@ -677,7 +677,14 @@ app.post("/vehicles", validateJWT, async (req, res) => {
       ...req.body,
       user_id: req.user.id,
     };
-    const vehicle = await db.createVehicle(vehicleData, req.userToken);
+    /* const vehicle = await db.createVehicle(vehicleData, req.userToken); */
+    const vehicle = await AuditLogger.auditCreate({
+      tableName: "vehicles",
+      data: vehicleData,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     res.status(201).json(vehicle);
   } catch (error) {
     console.error("Error creating vehicle:", error);
@@ -710,11 +717,19 @@ app.get("/vehicles/:id", validateJWT, async (req, res) => {
 
 app.put("/vehicles/:id", validateJWT, async (req, res) => {
   try {
-    const vehicle = await db.updateVehicle(
+    /* const vehicle = await db.updateVehicle(
       req.params.id,
       req.body,
       req.userToken
-    );
+    ); */
+    const vehicle = await AuditLogger.auditUpdate({
+      tableName: "vehicles",
+      id: req.params.id,
+      updates: req.body,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     if (!vehicle) {
       return res.status(404).json({ error: "Vehicle not found" });
     }
@@ -727,7 +742,14 @@ app.put("/vehicles/:id", validateJWT, async (req, res) => {
 
 app.delete("/vehicles/:id", validateJWT, async (req, res) => {
   try {
-    await db.deleteVehicle(req.params.id, req.userToken);
+    /* await db.deleteVehicle(req.params.id, req.userToken); */
+    await AuditLogger.auditDelete({
+      tableName: "vehicles",
+      id: req.params.id,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting vehicle:", error);
