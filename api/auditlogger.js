@@ -1,9 +1,32 @@
-// auditLogger.js
 const { getSupabaseClient } = require("./database.js");
 
 const EXCLUDE_FIELDS = ["created_at", "updated_at"];
 
 class AuditLogger {
+  /**
+   * Get org_id from user's staff profile
+   */
+  static async getUserOrgId(userId, userToken) {
+    try {
+      const client = getSupabaseClient(userToken);
+      const { data, error } = await client
+        .from("staff_profiles")
+        .select("org_id")
+        .eq("user_id", userId)
+        .single();
+
+      if (error || !data) {
+        console.warn("Could not fetch org_id for user:", userId);
+        return null;
+      }
+
+      return data.org_id;
+    } catch (error) {
+      console.error("Error fetching org_id:", error);
+      return null;
+    }
+  }
+
   static compareObjects(oldObj, newObj, excludeFields = EXCLUDE_FIELDS) {
     const changes = [];
     const allKeys = new Set([
@@ -39,10 +62,13 @@ class AuditLogger {
       }));
   }
 
-  static async log({ userId, orgId, tableName, action, changes, userToken }) {
+  static async log({ userId, tableName, action, changes, userToken }) {
     if (!changes || changes.length === 0) return;
 
     try {
+      // user_id로부터 org_id 조회
+      const orgId = await this.getUserOrgId(userId, userToken);
+
       const client = getSupabaseClient(userToken);
       const timestamp = new Date().toISOString();
 
@@ -76,7 +102,6 @@ class AuditLogger {
     tableName,
     data,
     userId,
-    orgId,
     userToken,
     idField = "id",
   }) {
@@ -93,7 +118,6 @@ class AuditLogger {
     const changes = this.objectToChanges(newRecord);
     await this.log({
       userId,
-      orgId,
       tableName,
       action: "ADD",
       changes,
@@ -111,7 +135,6 @@ class AuditLogger {
     id,
     updates,
     userId,
-    orgId,
     userToken,
     idField = "id",
   }) {
@@ -141,7 +164,6 @@ class AuditLogger {
     if (changes.length > 0) {
       await this.log({
         userId,
-        orgId,
         tableName,
         action: "UPDATE",
         changes,
@@ -159,7 +181,6 @@ class AuditLogger {
     tableName,
     id,
     userId,
-    orgId,
     userToken,
     idField = "id",
   }) {
@@ -192,7 +213,6 @@ class AuditLogger {
 
     await this.log({
       userId,
-      orgId,
       tableName,
       action: "DELETE",
       changes,

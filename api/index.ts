@@ -1,5 +1,5 @@
 require("dotenv").config();
-
+const { AuditLogger } = require("./auditlogger");
 const express = require("express");
 const app = express();
 const { sql } = require("@vercel/postgres");
