@@ -194,7 +194,14 @@ app.post("/clients", validateJWTWithOrg, async (req, res) => {
       ...req.body,
       org_id: req.user.org_id,
     };
-    const client = await db.createClient(clientData, req.userToken);
+    /* const client = await db.createClient(clientData, req.userToken); */
+    const client = await AuditLogger.auditCreate({
+      tableName: "clients",
+      data: clientData,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     res.status(201).json(client);
   } catch (error) {
     console.error("Error creating client:", error);
@@ -238,11 +245,20 @@ app.get("/clients/:id", validateJWT, async (req, res) => {
 
 app.put("/clients/:id", validateJWT, async (req, res) => {
   try {
-    const client = await db.updateClient(
+    /* const client = await db.updateClient(
       req.params.id,
       req.body,
       req.userToken
-    );
+    ); */
+    //adding to log as well
+    const client = await AuditLogger.auditUpdate({
+      tableName: "clients",
+      id: req.params.id,
+      updates: req.body,
+      userId: req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     if (!client) {
       return res.status(404).json({ error: "Client not found" });
     }
@@ -255,7 +271,14 @@ app.put("/clients/:id", validateJWT, async (req, res) => {
 
 app.delete("/clients/:id", validateJWT, async (req, res) => {
   try {
-    await db.deleteClient(req.params.id, req.userToken);
+    /* await db.deleteClient(req.params.id, req.userToken); */
+    await AuditLogger.auditDelete({
+      tableName: "clients",
+      id: req.params.id,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting client:", error);
