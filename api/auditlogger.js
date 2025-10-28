@@ -1,6 +1,6 @@
 const { getSupabaseClient } = require("./database.js");
 
-const EXCLUDE_FIELDS = ["created_at", "updated_at"];
+const EXCLUDE_FIELDS = ["created_at", "updated_at", "user_id"];
 
 class AuditLogger {
   /**
