@@ -203,7 +203,10 @@ class AuditLogger {
     if (deleteError) throw new Error(`Database error: ${deleteError.message}`);
 
     const changes = Object.entries(oldRecord)
-      .filter(([key]) => !["created_at", "updated_at", idField].includes(key))
+      .filter(
+        ([key]) =>
+          !["created_at", "updated_at", "user_id", idField].includes(key)
+      )
       .map(([key, value]) => ({
         field_name: key,
         old_value: value?.toString() || "",
