@@ -350,7 +350,14 @@ app.put("/driver-unavailability/:id", validateJWT, async (req, res) => {
 
 app.delete("/driver-unavailability/:id", validateJWT, async (req, res) => {
   try {
-    await db.deleteDriverUnavailability(req.params.id, req.userToken);
+    /* await db.deleteDriverUnavailability(req.params.id, req.userToken); */
+    await AuditLogger.auditDelete({
+      tableName: "driver_unavailability",
+      id: req.params.id,
+      userId: req.userId,
+      userToken: req.userToken,
+      idField: "id",
+    });
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting driver unavailability:", error);
