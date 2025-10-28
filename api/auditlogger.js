@@ -57,8 +57,8 @@ class AuditLogger {
       .filter(([key]) => !excludeFields.includes(key))
       .map(([key, value]) => ({
         field_name: key,
-        old_value: null,
-        new_value: value?.toString() || null,
+        old_value: "",
+        new_value: value?.toString() || "",
       }));
   }
 
@@ -66,7 +66,6 @@ class AuditLogger {
     if (!changes || changes.length === 0) return;
 
     try {
-      // user_id로부터 org_id 조회
       const orgId = await this.getUserOrgId(userId, userToken);
 
       const client = getSupabaseClient(userToken);
@@ -207,8 +206,8 @@ class AuditLogger {
       .filter(([key]) => !["created_at", "updated_at", idField].includes(key))
       .map(([key, value]) => ({
         field_name: key,
-        old_value: value?.toString() || null,
-        new_value: null,
+        old_value: value?.toString() || "",
+        new_value: "",
       }));
 
     await this.log({
