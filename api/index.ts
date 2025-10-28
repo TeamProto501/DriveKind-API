@@ -354,7 +354,7 @@ app.delete("/driver-unavailability/:id", validateJWT, async (req, res) => {
     await AuditLogger.auditDelete({
       tableName: "driver_unavailability",
       id: req.params.id,
-      userId: req.userId,
+      userId: req.user.Id,
       userToken: req.userToken,
       idField: "id",
     });
