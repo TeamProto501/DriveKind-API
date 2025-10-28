@@ -275,17 +275,26 @@ app.get("/driver-unavailability", validateJWT, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch driver unavailabilities" });
   }
 });
+
+//testing with logger
 app.post("/driver-unavailability", validateJWT, async (req, res) => {
   const unavailabilityData = {
     ...req.body,
     user_id: req.user.id,
   };
   try {
-    const unavailabilities = await db.createDriverUnavailability(
+    /* const unavailabilities = await db.createDriverUnavailability(
       unavailabilityData,
       req.userToken
-    );
-    res.status(201).json(unavailabilities);
+    ); */
+    const unavailability = await AuditLogger.auditCreate({
+      tableName: "driver_unavailability",
+      data: unavailabilityData,
+      userId: req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
+    res.status(201).json(/* unavailabilities */ unavailability);
   } catch (err) {
     console.error("Error creating driver unavailabilities:", err);
     res.status(500).json({ error: "Failed to create driver unavailabilities" });
