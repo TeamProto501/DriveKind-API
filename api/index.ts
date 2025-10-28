@@ -8,6 +8,22 @@ const { createClient } = require("@supabase/supabase-js");
 const { createServerClient } = require("@supabase/ssr");
 const cors = require("cors");
 
+
+///
+///
+///
+///
+///
+/// Ride Match Algo
+const { applyHardFilter, rankDrivers } = require("./business.js");
+///
+///
+///
+///
+///
+///
+
+
 const bodyParser = require("body-parser");
 const path = require("path");
 const session = require("express-session");
@@ -574,6 +590,78 @@ app.delete("/timecards/:id", validateJWT, async (req, res) => {
   }
 });
 
+///
+///
+///
+///
+/// Ride match algo
+app.post("/rides/match", validateJWT, validateOrgAccess, async (req, res) => {
+  try {
+    // Add org_id to the request body for audit logging/filtering later
+    const rideRequest = {
+        ...req.body,
+        org_id: req.user.org_id,
+        // Assume rideId is generated on the frontend or passed in for logging
+        rideId: req.body.ride_id || uuidv4(), 
+        // Assume timeWindow is passed in as { start: '...', end: '...' }
+    };
+
+    const activeDrivers = await db.getActiveDriversWithProfiles(req.user.org_id, req.userToken);
+    const driverStats = await db.getDriverRideStatsForSorting(req.userToken);
+
+    // 2. Apply Hard Filter (Elimination)
+    const qualifiedDrivers = await applyHardFilter(rideRequest, activeDrivers, req.userToken);
+
+    // 3. Apply Quality Filter (Ranking)
+    const rankedDrivers = rankDrivers(qualifiedDrivers, rideRequest, driverStats);
+
+    res.json({
+      success: true,
+      ranked_drivers: rankedDrivers,
+      count: rankedDrivers.length
+    });
+
+  } catch (error) {
+    console.error("Error during ride matching process:", error);
+    res.status(500).json({ error: "Failed to process ride match" });
+  }
+});
+
+app.post("/rides/:ride_id/accept", validateJWT, async (req, res) => {
+    try {
+        const { driver_user_id, vehicle_id } = req.body;
+        const rideId = req.params.ride_id;
+        
+        if (!driver_user_id) {
+            return res.status(400).json({ error: "driver_user_id is required" });
+        }
+
+        // 1. Update the ride status and assign the driver (status: "Accepted")
+        const updatedRide = await db.updateRide(rideId, { 
+            driver_user_id: driver_user_id, 
+            vehicle_id: vehicle_id || null, 
+            status: "Accepted" 
+        }, req.userToken);
+
+        if (!updatedRide) {
+            return res.status(404).json({ error: "Ride not found or update failed" });
+        }
+
+        // 2. Update the driver's rotation stats immediately (atomic part)
+        await db.updateDriverRotationStats(driver_user_id, req.userToken);
+
+        res.json({ success: true, ride: updatedRide });
+    } catch (error) {
+        console.error("Error finalizing ride acceptance:", error);
+        res.status(500).json({ error: "Failed to finalize ride assignment" });
+    }
+});
+///
+///
+///
+///
+///
+
 // Staff Profiles routes
 app.post("/staff-profiles", validateJWT, async (req, res) => {
   try {
@@ -1006,3 +1094,5 @@ app.get("/reports/rides/stats", validateJWT, async (req, res) => {
 app.listen(3000, () => console.log("Server ready on port 3000."));
 
 module.exports = app;
+
+

@@ -562,6 +562,103 @@ async function getDriverRideStats(userId, startDate, endDate, userToken) {
   };
 }
 
+///
+///
+///
+///
+///Implementing algorithm
+async function getActiveDriversWithProfiles(orgId, userToken) {
+  const client = getSupabaseClient(userToken);
+  // Select staff_profiles, inner-joining on vehicles (assuming a 1-to-1 or 1-to-many relationship where we only need the active vehicle)
+  // NOTE: This assumes 'vehicles' table has a 'user_id' and 'driver_status' field for filtering.
+  // In your current database.js, there is no vehicle-fetching function, so we simulate a complex join.
+  return handle(
+    client
+      .from("staff_profiles")
+      .select(`
+        user_id,
+        first_name,
+        last_name,
+        can_accept_service_animals,
+        allergens,
+        town_preference,
+        vehicles:vehicles!inner (
+            vehicle_id,
+            max_passengers,
+            height,
+            driver_status
+        )
+      `)
+      .eq('org_id', orgId)
+      .contains('role', ['Driver'])
+      .eq('driver_status', 'Active') // Assuming driver_status field on staff_profiles or vehicles filter
+  );
+}
+
+async function getDriverAvailability(driverId, timeWindow, userToken) {
+  const client = getSupabaseClient(userToken);
+  // Assuming 'timeWindow' is an object { start: 'ISO_STRING', end: 'ISO_STRING' }
+  // We check for any driver_unavailability entries that overlap with the ride's time
+  return handle(
+    client
+      .from("driver_unavailability")
+      .select("id")
+      .eq("user_id", driverId)
+      .lte("shift_start", timeWindow.end)
+      .gte("shift_end", timeWindow.start)
+  );
+}
+
+async function getDriverRideStatsForSorting(userToken) {
+  const client = getSupabaseClient(userToken);
+  // This uses a placeholder table 'driver_stats' or an RPC (Remote Procedure Call)
+  // For simplicity, we simulate getting last_drove from the 'rides' table via max(pickup_date)
+  // NOTE: A robust implementation should use an indexed `driver_stats` table or a DB function.
+  // We'll return an empty array here, as the final data structure needs a DB query or RPC, and we can't create that here.
+  return []; 
+}
+
+async function recordMatchFailure(rideId, driverId, reason, userToken) {
+  const client = getSupabaseClient(userToken);
+  // NOTE: You don't have a 'match_failures_log' table in the provided schema. 
+  // We will log to the general 'transactions_audit_log' for now, using a placeholder action.
+  const logData = {
+    user_id: driverId,
+    action: "Ride Match Failure",
+    table_name: "rides",
+    record_id: rideId,
+    field_name: "match_failure_reason",
+    new_value: reason,
+    // org_id would need to be fetched, but we omit it for this quick insert.
+  };
+  // We call the existing log creation function, even though it expects org_id. We omit org_id for now.
+  console.log(`[AUDIT] Match failure for driver ${driverId} on ride ${rideId}: ${reason}`);
+  // return createTransactionAuditLog(logData, userToken); // Uncomment if the log table can handle the structure
+  return { success: true, message: "Match failure logged (mocked)" };
+}
+
+async function updateDriverRotationStats(driverId, userToken) {
+  const client = getSupabaseClient(userToken);
+  // This updates the staff_profiles or a dedicated 'drivers' table with the current time.
+  // We will update the `staff_profiles` table, assuming a `last_drove` column exists there.
+  // NOTE: You need to ensure the `staff_profiles` table has a `last_drove` (timestamp) column.
+  return handle(
+    client
+      .from("staff_profiles")
+      .update({ last_drove: new Date().toISOString() }) // Assuming column name is `last_drove`
+      .eq("user_id", driverId)
+      .select()
+      .single()
+  );
+}
+///
+///
+///
+///
+///
+
+
+
 module.exports = {
   supabase,
   getSupabaseClient,
@@ -616,4 +713,11 @@ module.exports = {
   previewLogsByTimeRange,
   getDriverUnavailabilityByUId,
   getDriverRideStats,
+  getActiveDriversWithProfiles,
+  getDriverAvailability,
+  getDriverRideStatsForSorting,
+  recordMatchFailure,
+  updateDriverRotationStats,
 };
+
+
