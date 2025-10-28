@@ -138,16 +138,6 @@ async function getAllDriverUnavailabilities(userToken) {
   return handle(client.from("driver_unavailability"));
 }
 
-async function getAllTimecards(userToken) {
-  const client = getSupabaseClient(userToken);
-  return handle(
-    client
-      .from("timecards")
-
-      .select("*")
-  );
-}
-
 async function getDriverUnavailabilityById(id, userToken) {
   const client = getSupabaseClient(userToken);
   return handle(client.from("driver_unavailability").select("*").eq("id", id));
@@ -159,66 +149,11 @@ async function getDriverUnavailabilityByUId(id, userToken) {
     client.from("driver_unavailability").select("*").eq("user_id", id)
   );
 }
-async function getTimecardById(timecardId, userToken) {
-  const client = getSupabaseClient(userToken);
-  return handle(
-    client.from("timecards").select("*").eq("timecard_id", timecardId).single()
-  );
-}
 
 async function updateDriverUnavailability(id, unavailabilityData, userToken) {
   const client = getSupabaseClient(userToken);
   return handle(
     client.from("driver_unavailability").update(unavailabilityData).eq("id", id)
-  );
-}
-async function updateTimecard(timecardId, timecardData, userToken) {
-  const client = getSupabaseClient(userToken);
-  return handle(
-    client
-      .from("timecards")
-      .update(timecardData)
-      .eq("timecard_id", timecardId)
-      .select()
-      .single()
-  );
-}
-
-async function createTimecard(timecardData, userToken) {
-  const client = getSupabaseClient(userToken);
-  return handle(
-    client.from("timecards").insert(timecardData).select().single()
-  );
-}
-
-async function getAllTimecards(userToken) {
-  const client = getSupabaseClient(userToken);
-  return handle(client.from("timecards").select("*"));
-}
-
-async function getTimecardById(timecardId, userToken) {
-  const client = getSupabaseClient(userToken);
-  return handle(
-    client.from("timecards").select("*").eq("timecard_id", timecardId).single()
-  );
-}
-
-async function updateTimecard(timecardId, timecardData, userToken) {
-  const client = getSupabaseClient(userToken);
-  return handle(
-    client
-      .from("timecards")
-      .update(timecardData)
-      .eq("timecard_id", timecardId)
-      .select()
-      .single()
-  );
-}
-
-async function deleteTimecard(timecardId, userToken) {
-  const client = getSupabaseClient(userToken);
-  return handle(
-    client.from("timecards").delete().eq("timecard_id", timecardId)
   );
 }
 
@@ -534,7 +469,7 @@ async function previewLogsByTimeRange(userToken, startTime, endTime) {
 
 async function getDriverRideStats(userId, startDate, endDate, userToken) {
   const client = getSupabaseClient(userToken);
-  
+
   const { data: rides, error } = await client
     .from("rides")
     .select("ride_id, status, pickup_date")
@@ -547,18 +482,16 @@ async function getDriverRideStats(userId, startDate, endDate, userToken) {
     throw new Error(`Database error: ${error.message}`);
   }
 
-  const scheduledRides = rides.filter(r => 
-    r.status === 'Scheduled' || r.status === 'Assigned'
+  const scheduledRides = rides.filter(
+    (r) => r.status === "Scheduled" || r.status === "Assigned"
   ).length;
-  
-  const completedRides = rides.filter(r => 
-    r.status === 'Completed'
-  ).length;
+
+  const completedRides = rides.filter((r) => r.status === "Completed").length;
 
   return {
     scheduled: scheduledRides,
     completed: completedRides,
-    total: rides.length
+    total: rides.length,
   };
 }
 
@@ -581,11 +514,6 @@ module.exports = {
   getDriverUnavailabilityById,
   updateDriverUnavailability,
   deleteDriverUnavailability,
-  createTimecard,
-  getAllTimecards,
-  getTimecardById,
-  updateTimecard,
-  deleteTimecard,
   createStaffProfile,
   getAllStaffProfiles,
   getStaffProfileById,

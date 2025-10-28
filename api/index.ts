@@ -508,72 +508,6 @@ app.delete("/calls/:id", validateJWT, async (req, res) => {
   }
 });
 
-// Timecards routes
-app.post("/timecards", validateJWTWithOrg, async (req, res) => {
-  try {
-    const timecardData = {
-      ...req.body,
-      org_id: req.user.org_id,
-      user_id: req.user.id,
-    };
-    const timecard = await db.createTimecard(timecardData, req.userToken);
-    res.status(201).json(timecard);
-  } catch (error) {
-    console.error("Error creating timecard:", error);
-    res.status(500).json({ error: "Failed to create timecard" });
-  }
-});
-
-app.get("/timecards", validateJWT, async (req, res) => {
-  try {
-    const timecards = await db.getAllTimecards(req.userToken);
-    res.json(timecards);
-  } catch (error) {
-    console.error("Error fetching timecards:", error);
-    res.status(500).json({ error: "Failed to fetch timecards" });
-  }
-});
-
-app.get("/timecards/:id", validateJWT, async (req, res) => {
-  try {
-    const timecard = await db.getTimecardById(req.params.id, req.userToken);
-    if (!timecard) {
-      return res.status(404).json({ error: "Timecard not found" });
-    }
-    res.json(timecard);
-  } catch (error) {
-    console.error("Error fetching timecard:", error);
-    res.status(500).json({ error: "Failed to fetch timecard" });
-  }
-});
-
-app.put("/timecards/:id", validateJWT, async (req, res) => {
-  try {
-    const timecard = await db.updateTimecard(
-      req.params.id,
-      req.body,
-      req.userToken
-    );
-    if (!timecard) {
-      return res.status(404).json({ error: "Timecard not found" });
-    }
-    res.json(timecard);
-  } catch (error) {
-    console.error("Error updating timecard:", error);
-    res.status(500).json({ error: "Failed to update timecard" });
-  }
-});
-
-app.delete("/timecards/:id", validateJWT, async (req, res) => {
-  try {
-    await db.deleteTimecard(req.params.id, req.userToken);
-    res.status(204).send();
-  } catch (error) {
-    console.error("Error deleting timecard:", error);
-    res.status(500).json({ error: "Failed to delete timecard" });
-  }
-});
-
 // Staff Profiles routes
 app.post("/staff-profiles", validateJWT, async (req, res) => {
   try {
@@ -984,9 +918,11 @@ app.post("/log/previewByTime", validateJWT, async (req, res) => {
 app.get("/reports/rides/stats", validateJWT, async (req, res) => {
   try {
     const { start_date, end_date } = req.query;
-    
+
     if (!start_date || !end_date) {
-      return res.status(400).json({ error: "start_date and end_date are required" });
+      return res
+        .status(400)
+        .json({ error: "start_date and end_date are required" });
     }
 
     const stats = await db.getDriverRideStats(
@@ -995,7 +931,7 @@ app.get("/reports/rides/stats", validateJWT, async (req, res) => {
       end_date,
       req.userToken
     );
-    
+
     res.json(stats);
   } catch (error) {
     console.error("Error fetching ride stats:", error);
