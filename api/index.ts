@@ -257,7 +257,7 @@ app.put("/clients/:id", validateJWT, async (req, res) => {
       updates: req.body,
       userId: req.user.id,
       userToken: req.userToken,
-      idField: "id",
+      idField: "client_id",
     });
     if (!client) {
       return res.status(404).json({ error: "Client not found" });
@@ -277,7 +277,7 @@ app.delete("/clients/:id", validateJWT, async (req, res) => {
       id: req.params.id,
       userId: req.userId || req.user.id,
       userToken: req.userToken,
-      idField: "id",
+      idField: "client_id",
     });
     res.status(204).send();
   } catch (error) {
