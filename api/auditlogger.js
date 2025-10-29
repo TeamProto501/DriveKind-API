@@ -27,7 +27,12 @@ class AuditLogger {
     }
   }
 
-  static compareObjects(oldObj, newObj, excludeFields = EXCLUDE_FIELDS) {
+  static compareObjects(
+    oldObj,
+    newObj,
+    excludeFields = EXCLUDE_FIELDS,
+    idField = "id"
+  ) {
     const changes = [];
     const allKeys = new Set([
       ...Object.keys(oldObj || {}),
@@ -35,7 +40,7 @@ class AuditLogger {
     ]);
 
     allKeys.forEach((key) => {
-      if (excludeFields.includes(key)) return;
+      if (excludeFields.includes(key) || key === idField) return;
 
       const oldVal = oldObj?.[key];
       const newVal = newObj?.[key];
@@ -52,9 +57,9 @@ class AuditLogger {
     return changes;
   }
 
-  static objectToChanges(obj, excludeFields = EXCLUDE_FIELDS) {
+  static objectToChanges(obj, excludeFields = EXCLUDE_FIELDS, idField = "id") {
     return Object.entries(obj)
-      .filter(([key]) => !excludeFields.includes(key))
+      .filter(([key]) => !excludeFields.includes(key) && key !== idField)
       .map(([key, value]) => ({
         field_name: key,
         old_value: "",
