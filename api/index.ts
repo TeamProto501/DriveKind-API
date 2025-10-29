@@ -200,7 +200,7 @@ app.post("/clients", validateJWTWithOrg, async (req, res) => {
       data: clientData,
       userId: req.userId || req.user.id,
       userToken: req.userToken,
-      idField: "id",
+      idField: "client_id",
     });
     res.status(201).json(client);
   } catch (error) {
