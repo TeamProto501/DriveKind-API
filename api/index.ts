@@ -493,7 +493,14 @@ app.post("/calls", validateJWTWithOrg, async (req, res) => {
       org_id: req.user.org_id,
       user_id: req.user.id,
     };
-    const call = await db.createCall(callData, req.userToken);
+    /* const call = await db.createCall(callData, req.userToken); */
+    const call = await AuditLogger.auditCreate({
+      tableName: "calls",
+      data: callData,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "call_id",
+    });
     res.status(201).json(call);
   } catch (error) {
     console.error("Error creating call:", error);
@@ -526,7 +533,15 @@ app.get("/calls/:id", validateJWT, async (req, res) => {
 
 app.put("/calls/:id", validateJWT, async (req, res) => {
   try {
-    const call = await db.updateCall(req.params.id, req.body, req.userToken);
+    /*  const call = await db.updateCall(req.params.id, req.body, req.userToken); */
+    const call = await AuditLogger.auditUpdate({
+      tableName: "calls",
+      id: req.params.id,
+      updates: req.body,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "call_id",
+    });
     if (!call) {
       return res.status(404).json({ error: "Call not found" });
     }
@@ -539,7 +554,14 @@ app.put("/calls/:id", validateJWT, async (req, res) => {
 
 app.delete("/calls/:id", validateJWT, async (req, res) => {
   try {
-    await db.deleteCall(req.params.id, req.userToken);
+    /* await db.deleteCall(req.params.id, req.userToken); */
+    await AuditLogger.auditDelete({
+      tableName: "calls",
+      id: req.params.id,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "call_id",
+    });
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting call:", error);
