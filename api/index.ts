@@ -555,14 +555,14 @@ app.post("/staff-profiles", validateJWT, async (req, res) => {
       // org_id should come from request body since we're creating the profile
       org_id: req.body.org_id || 1, // Use provided org_id or default to 1
     };
-    /* const profile = await db.createStaffProfile(profileData, req.userToken); */
-    const profile = await AuditLogger.auditCreate({
+    const profile = await db.createStaffProfile(profileData, req.userToken);
+    /* const profile = await AuditLogger.auditCreate({
       tableName: "staff_profiles",
       data: profileData,
       userId: req.userId || req.user.id,
       userToken: req.userToken,
       idField: "user_id",
-    });
+    }); */
     res.status(201).json(profile);
   } catch (error) {
     console.error("Error creating staff profile:", error);
