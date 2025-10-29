@@ -194,7 +194,14 @@ app.post("/clients", validateJWTWithOrg, async (req, res) => {
       ...req.body,
       org_id: req.user.org_id,
     };
-    const client = await db.createClient(clientData, req.userToken);
+    /* const client = await db.createClient(clientData, req.userToken); */
+    const client = await AuditLogger.auditCreate({
+      tableName: "clients",
+      data: clientData,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     res.status(201).json(client);
   } catch (error) {
     console.error("Error creating client:", error);
@@ -238,11 +245,20 @@ app.get("/clients/:id", validateJWT, async (req, res) => {
 
 app.put("/clients/:id", validateJWT, async (req, res) => {
   try {
-    const client = await db.updateClient(
+    /* const client = await db.updateClient(
       req.params.id,
       req.body,
       req.userToken
-    );
+    ); */
+    //adding to log as well
+    const client = await AuditLogger.auditUpdate({
+      tableName: "clients",
+      id: req.params.id,
+      updates: req.body,
+      userId: req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     if (!client) {
       return res.status(404).json({ error: "Client not found" });
     }
@@ -255,7 +271,14 @@ app.put("/clients/:id", validateJWT, async (req, res) => {
 
 app.delete("/clients/:id", validateJWT, async (req, res) => {
   try {
-    await db.deleteClient(req.params.id, req.userToken);
+    /* await db.deleteClient(req.params.id, req.userToken); */
+    await AuditLogger.auditDelete({
+      tableName: "clients",
+      id: req.params.id,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting client:", error);
@@ -532,7 +555,14 @@ app.post("/staff-profiles", validateJWT, async (req, res) => {
       // org_id should come from request body since we're creating the profile
       org_id: req.body.org_id || 1, // Use provided org_id or default to 1
     };
-    const profile = await db.createStaffProfile(profileData, req.userToken);
+    /* const profile = await db.createStaffProfile(profileData, req.userToken); */
+    const profile = await AuditLogger.auditCreate({
+      tableName: "staff_profiles",
+      data: profileData,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "user_id",
+    });
     res.status(201).json(profile);
   } catch (error) {
     console.error("Error creating staff profile:", error);
@@ -565,11 +595,19 @@ app.get("/staff-profiles/:id", validateJWT, async (req, res) => {
 
 app.put("/staff-profiles/:id", validateJWT, async (req, res) => {
   try {
-    const profile = await db.updateStaffProfile(
+    /* const profile = await db.updateStaffProfile(
       req.params.id,
       req.body,
       req.userToken
-    );
+    ); */
+    const profile = await AuditLogger.auditUpdate({
+      tableName: "staff_profiles",
+      id: req.params.id,
+      updates: req.body,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "user_id",
+    });
     if (!profile) {
       return res.status(404).json({ error: "Staff profile not found" });
     }
@@ -585,8 +623,14 @@ app.delete("/staff-profiles/:id", validateJWT, async (req, res) => {
     const userId = req.params.id;
 
     // First delete the staff profile from the database
-    await db.deleteStaffProfile(userId, req.userToken);
-
+    /* await db.deleteStaffProfile(userId, req.userToken); */
+    await AuditLogger.auditDelete({
+      tableName: "staff_profiles",
+      id: userId,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "user_id",
+    });
     // Then delete the auth user using admin client
     const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(
       userId
@@ -654,7 +698,14 @@ app.post("/vehicles", validateJWT, async (req, res) => {
       ...req.body,
       user_id: req.user.id,
     };
-    const vehicle = await db.createVehicle(vehicleData, req.userToken);
+    /* const vehicle = await db.createVehicle(vehicleData, req.userToken); */
+    const vehicle = await AuditLogger.auditCreate({
+      tableName: "vehicles",
+      data: vehicleData,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     res.status(201).json(vehicle);
   } catch (error) {
     console.error("Error creating vehicle:", error);
@@ -687,11 +738,19 @@ app.get("/vehicles/:id", validateJWT, async (req, res) => {
 
 app.put("/vehicles/:id", validateJWT, async (req, res) => {
   try {
-    const vehicle = await db.updateVehicle(
+    /* const vehicle = await db.updateVehicle(
       req.params.id,
       req.body,
       req.userToken
-    );
+    ); */
+    const vehicle = await AuditLogger.auditUpdate({
+      tableName: "vehicles",
+      id: req.params.id,
+      updates: req.body,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     if (!vehicle) {
       return res.status(404).json({ error: "Vehicle not found" });
     }
@@ -704,7 +763,14 @@ app.put("/vehicles/:id", validateJWT, async (req, res) => {
 
 app.delete("/vehicles/:id", validateJWT, async (req, res) => {
   try {
-    await db.deleteVehicle(req.params.id, req.userToken);
+    /* await db.deleteVehicle(req.params.id, req.userToken); */
+    await AuditLogger.auditDelete({
+      tableName: "vehicles",
+      id: req.params.id,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting vehicle:", error);
@@ -715,7 +781,14 @@ app.delete("/vehicles/:id", validateJWT, async (req, res) => {
 // Organization routes
 app.post("/organizations", validateJWT, async (req, res) => {
   try {
-    const organization = await db.createOrganization(req.body, req.userToken);
+    /* const organization = await db.createOrganization(req.body, req.userToken); */
+    const organization = await AuditLogger.auditCreate({
+      tableName: "organizations",
+      data: req.body,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     res.status(201).json(organization);
   } catch (error) {
     console.error("Error creating organization:", error);
@@ -751,11 +824,19 @@ app.get("/organizations/:id", validateJWT, async (req, res) => {
 
 app.put("/organizations/:id", validateJWT, async (req, res) => {
   try {
-    const organization = await db.updateOrganization(
+    /* const organization = await db.updateOrganization(
       req.params.id,
       req.body,
       req.userToken
-    );
+    ); */
+    const organization = await AuditLogger.auditUpdate({
+      tableName: "organizations",
+      id: req.params.id,
+      updates: req.body,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     if (!organization) {
       return res.status(404).json({ error: "Organization not found" });
     }
@@ -768,7 +849,14 @@ app.put("/organizations/:id", validateJWT, async (req, res) => {
 
 app.delete("/organizations/:id", validateJWT, async (req, res) => {
   try {
-    await db.deleteOrganization(req.params.id, req.userToken);
+    /* await db.deleteOrganization(req.params.id, req.userToken); */
+    await AuditLogger.auditDelete({
+      tableName: "organizations",
+      id: req.params.id,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "id",
+    });
     res.status(204).send();
   } catch (error) {
     console.error("Error deleting organization:", error);
