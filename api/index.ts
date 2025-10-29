@@ -555,7 +555,14 @@ app.post("/staff-profiles", validateJWT, async (req, res) => {
       // org_id should come from request body since we're creating the profile
       org_id: req.body.org_id || 1, // Use provided org_id or default to 1
     };
-    const profile = await db.createStaffProfile(profileData, req.userToken);
+    /* const profile = await db.createStaffProfile(profileData, req.userToken); */
+    const profile = await AuditLogger.auditCreate({
+      tableName: "staff_profiles",
+      data: profileData,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "user_id",
+    });
     res.status(201).json(profile);
   } catch (error) {
     console.error("Error creating staff profile:", error);
@@ -588,11 +595,19 @@ app.get("/staff-profiles/:id", validateJWT, async (req, res) => {
 
 app.put("/staff-profiles/:id", validateJWT, async (req, res) => {
   try {
-    const profile = await db.updateStaffProfile(
+    /* const profile = await db.updateStaffProfile(
       req.params.id,
       req.body,
       req.userToken
-    );
+    ); */
+    const profile = await AuditLogger.auditUpdate({
+      tableName: "staff_profiles",
+      id: req.params.id,
+      updates: req.body,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "user_id",
+    });
     if (!profile) {
       return res.status(404).json({ error: "Staff profile not found" });
     }
@@ -608,8 +623,14 @@ app.delete("/staff-profiles/:id", validateJWT, async (req, res) => {
     const userId = req.params.id;
 
     // First delete the staff profile from the database
-    await db.deleteStaffProfile(userId, req.userToken);
-
+    /* await db.deleteStaffProfile(userId, req.userToken); */
+    await AuditLogger.auditDelete({
+      tableName: "staff_profiles",
+      id: userId,
+      userId: req.userId || req.user.id,
+      userToken: req.userToken,
+      idField: "user_id",
+    });
     // Then delete the auth user using admin client
     const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(
       userId
