@@ -1069,7 +1069,7 @@ app.get("/reports/rides/stats", validateJWT, async (req, res) => {
 app.post("/rides/:rideId/confirm", validateJWT, async (req, res) => {
   try {
     const rideId = parseInt(req.params.rideId);
-    const { miles_driven, hours, donation_amount } = req.body;
+    const { hours, miles_driven, donation_received, donation_amount, completion_status, comments } = req.body;
 
     // Verify dispatcher/admin role
     const { data: profile, error: profileError } = await supabaseAdmin
@@ -1108,13 +1108,16 @@ app.post("/rides/:rideId/confirm", validateJWT, async (req, res) => {
       return res.status(400).json({ error: 'Ride must be in Reported status to confirm' });
     }
 
-    // Update the ride status to Completed
+    // Update the ride status to Completed with all details
     const { error: updateError } = await supabaseAdmin
       .from('rides')
       .update({ 
         status: 'Completed',
+        hours: hours || null,
         miles_driven: miles_driven || null,
-        hours: hours || null
+        donation: donation_received || false,
+        donation_amount: donation_received && donation_amount ? donation_amount : null,
+        completion_status: completion_status || null
       })
       .eq('ride_id', rideId);
 
@@ -1127,9 +1130,10 @@ app.post("/rides/:rideId/confirm", validateJWT, async (req, res) => {
     const { error: completedError } = await supabaseAdmin
       .from('completedrides')
       .update({
-        miles_driven: miles_driven || null,
         hours: hours || null,
-        donation_amount: donation_amount || null
+        miles_driven: miles_driven || null,
+        donation_amount: donation_received && donation_amount ? donation_amount : null,
+        comments: comments || null
       })
       .eq('ride_id', rideId);
 
