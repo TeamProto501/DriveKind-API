@@ -1065,6 +1065,87 @@ app.get("/reports/rides/stats", validateJWT, async (req, res) => {
   }
 });
 
+// Confirm ride completion (dispatcher confirms driver's report)
+app.post("/rides/:rideId/confirm", validateJWT, async (req, res) => {
+  try {
+    const rideId = parseInt(req.params.rideId);
+    const { miles_driven, hours, donation_amount } = req.body;
+
+    // Verify dispatcher/admin role
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('staff_profiles')
+      .select('user_id, org_id, role')
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    const hasDispatcherRole = profile.role && (
+      Array.isArray(profile.role) 
+        ? (profile.role.includes('Dispatcher') || profile.role.includes('Admin'))
+        : (profile.role === 'Dispatcher' || profile.role === 'Admin')
+    );
+
+    if (!hasDispatcherRole) {
+      return res.status(403).json({ error: 'Access denied. Dispatcher or Admin role required.' });
+    }
+
+    // Verify the ride exists and is in Reported status
+    const { data: existingRide, error: rideError } = await supabaseAdmin
+      .from('rides')
+      .select('ride_id, org_id, status')
+      .eq('ride_id', rideId)
+      .eq('org_id', profile.org_id)
+      .single();
+
+    if (rideError || !existingRide) {
+      return res.status(404).json({ error: 'Ride not found or access denied' });
+    }
+
+    if (existingRide.status !== 'Reported') {
+      return res.status(400).json({ error: 'Ride must be in Reported status to confirm' });
+    }
+
+    // Update the ride status to Completed
+    const { error: updateError } = await supabaseAdmin
+      .from('rides')
+      .update({ 
+        status: 'Completed',
+        miles_driven: miles_driven || null,
+        hours: hours || null
+      })
+      .eq('ride_id', rideId);
+
+    if (updateError) {
+      console.error('Error confirming ride completion:', updateError);
+      return res.status(500).json({ error: 'Failed to confirm ride completion' });
+    }
+
+    // Update completed rides record
+    const { error: completedError } = await supabaseAdmin
+      .from('completedrides')
+      .update({
+        miles_driven: miles_driven || null,
+        hours: hours || null,
+        donation_amount: donation_amount || null
+      })
+      .eq('ride_id', rideId);
+
+    if (completedError) {
+      console.error('Error updating completed ride record:', completedError);
+      // Don't fail the request, just log the error
+    }
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('Error confirming ride completion:', error);
+    res.status(500).json({ error: `Internal server error: ${error.message}` });
+  }
+});
+
 app.listen(3000, () => console.log("Server ready on port 3000."));
 
 module.exports = app;
