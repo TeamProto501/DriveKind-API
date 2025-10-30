@@ -96,22 +96,34 @@ app.get("/", (req, res) => {
 const validateJWT = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
+    console.log('Auth header received:', authHeader ? 'Yes' : 'No');
+    
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.log('No valid auth header');
       return res.status(401).json({ error: "No token provided" });
     }
 
     const token = authHeader.split(" ")[1];
+    console.log('Token extracted, length:', token?.length);
+    
     const {
       data: { user },
       error,
     } = await supabase.auth.getUser(token);
 
-    if (error || !user) {
+    if (error) {
+      console.error('Token validation error:', error);
+      return res.status(401).json({ error: "Invalid token" });
+    }
+    
+    if (!user) {
+      console.log('No user found for token');
       return res.status(401).json({ error: "Invalid token" });
     }
 
+    console.log('Token validated for user:', user.id);
     req.user = user;
-    req.userToken = token; // Store token for passing to database functions
+    req.userToken = token;
     next();
   } catch (error) {
     console.error("JWT validation error:", error);
