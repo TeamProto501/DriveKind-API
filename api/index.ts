@@ -1212,6 +1212,8 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
       return res.status(404).json({ error: 'Ride not found' });
     }
 
+    console.log('Matching drivers for ride:', rideId);
+
     // Get all drivers in the organization
     const { data: drivers, error: driversError } = await supabaseAdmin
       .from('staff_profiles')
@@ -1224,21 +1226,53 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
         max_weekly_rides,
         can_accept_service_animals,
         town_preference,
-        destination_limitation,
-        vehicles:vehicles!vehicles_user_id_fkey (
-          vehicle_id,
-          nondriver_seats,
-          seat_height_enum,
-          type_of_vehicle_enum,
-          driver_status
-        )
+        destination_limitation
       `)
       .eq('org_id', profile.org_id)
       .contains('role', ['Driver']);
 
     if (driversError) {
+      console.error('Error fetching drivers:', driversError);
       return res.status(500).json({ error: 'Failed to fetch drivers' });
     }
+
+    console.log(`Found ${drivers?.length || 0} drivers in organization`);
+
+    // Get ALL vehicles for these drivers (separate query for better control)
+    const { data: allVehicles, error: vehiclesError } = await supabaseAdmin
+      .from('vehicles')
+      .select('*')
+      .in('user_id', drivers.map(d => d.user_id));
+
+    if (vehiclesError) {
+      console.error('Error fetching vehicles:', vehiclesError);
+    }
+
+    console.log(`Found ${allVehicles?.length || 0} total vehicles`);
+
+    // Log a sample vehicle to see the structure
+    if (allVehicles && allVehicles.length > 0) {
+      console.log('Sample vehicle:', JSON.stringify(allVehicles[0], null, 2));
+    }
+
+    // Create a map of user_id to their vehicles
+    const vehiclesByUser = {};
+    if (allVehicles) {
+      allVehicles.forEach(vehicle => {
+        if (!vehiclesByUser[vehicle.user_id]) {
+          vehiclesByUser[vehicle.user_id] = [];
+        }
+        vehiclesByUser[vehicle.user_id].push(vehicle);
+      });
+    }
+
+    // Log vehicle status breakdown (with actual enum values)
+    const vehicleStatusCounts = {};
+    allVehicles?.forEach(v => {
+      const status = v.driver_status; // Keep original case for counting
+      vehicleStatusCounts[status] = (vehicleStatusCounts[status] || 0) + 1;
+    });
+    console.log('Vehicle status breakdown:', vehicleStatusCounts);
 
     // Get unavailability for all drivers
     const rideDate = new Date(ride.appointment_time);
@@ -1263,7 +1297,7 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
       .select('driver_user_id')
       .in('driver_user_id', drivers.map(d => d.user_id))
       .gte('appointment_time', sevenDaysAgo.toISOString())
-      .in('status', ['Scheduled', 'Assigned', 'In Progress', 'Completed']);
+      .in('status', ['Scheduled', 'Assigned', 'In Progress', 'Completed', 'Pending']);
 
     const recentRideCounts = {};
     if (recentRides) {
@@ -1308,10 +1342,29 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
       }
 
       // 2. Check vehicle availability and capacity
-      const activeVehicles = driver.vehicles?.filter(v => v.driver_status === 'active') || [];
-      
+      const driverVehicles = vehiclesByUser[driver.user_id] || [];
+
+      // Filter for Active vehicles (matching the enum exactly)
+      const activeVehicles = driverVehicles.filter(v => {
+        // Handle both 'Active' and 'active' just in case
+        const status = v.driver_status;
+        return status === 'Active' || status === 'active';
+      });
+
+      console.log(`Driver ${driver.first_name} ${driver.last_name} (${driver.user_id}): ${driverVehicles.length} total vehicles, ${activeVehicles.length} active`);
+
+      // Log the actual statuses if there are vehicles but none active
+      if (driverVehicles.length > 0 && activeVehicles.length === 0) {
+        console.log(`  Vehicle statuses: ${driverVehicles.map(v => v.driver_status).join(', ')}`);
+      }
+
       if (activeVehicles.length === 0) {
-        result.exclusion_reasons.push('No active vehicle');
+        if (driverVehicles.length === 0) {
+          result.exclusion_reasons.push('No vehicle registered');
+        } else {
+          const statuses = driverVehicles.map(v => v.driver_status).join(', ');
+          result.exclusion_reasons.push(`No active vehicle (has ${driverVehicles.length} vehicle(s) with status: ${statuses})`);
+        }
         result.match_quality = 'excluded';
         return result;
       }
@@ -1337,10 +1390,10 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
       }
 
       // 4. Check vehicle height requirement
-      if (ride.clients?.car_height_needed_enum && ride.clients.car_height_needed_enum !== 'Standard') {
+      if (ride.clients?.car_height_needed_enum && ride.clients.car_height_needed_enum !== 'Standard' && ride.clients.car_height_needed_enum !== 'low') {
         const hasRequiredHeight = activeVehicles.some(v => {
-          if (ride.clients.car_height_needed_enum === 'Tall') {
-            return v.seat_height_enum === 'High' || v.type_of_vehicle_enum === 'SUV';
+          if (ride.clients.car_height_needed_enum === 'Tall' || ride.clients.car_height_needed_enum === 'high') {
+            return v.seat_height_enum === 'High' || v.seat_height_enum === 'high' || v.type_of_vehicle_enum === 'SUV';
           }
           return true;
         });
@@ -1353,7 +1406,6 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
       }
 
       // 5. Geography check (simplified - check if same ZIP or nearby)
-      // In production, you'd use actual distance calculation or ZIP radius
       const driverZip = String(driver.zipcode);
       const pickupZip = ride.pickup_from_home ? ride.clients?.zip_code : ride.alt_pickup_zipcode;
       const dropoffZip = ride.dropoff_zipcode;
@@ -1382,7 +1434,7 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
       
       // Score: 0-100 points for rotation
       if (daysSinceLastDrive > 30) {
-        result.score += 100; // Haven't driven in over a month
+        result.score += 100;
         result.reasons.push('High priority in rotation queue');
       } else if (daysSinceLastDrive > 14) {
         result.score += 75;
@@ -1390,7 +1442,7 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
       } else if (daysSinceLastDrive > 7) {
         result.score += 50;
       } else {
-        result.score += Math.max(0, daysSinceLastDrive * 5); // 0-35 points
+        result.score += Math.max(0, daysSinceLastDrive * 5);
       }
 
       // Balance: Recent assignment count - 0-30 points
@@ -1451,6 +1503,8 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
     const excludedDrivers = matchedDrivers
       .filter(d => d.match_quality === 'excluded')
       .sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`));
+
+    console.log(`Match results: ${availableDrivers.length} available, ${excludedDrivers.length} excluded`);
 
     res.json({
       success: true,
