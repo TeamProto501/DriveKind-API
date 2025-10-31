@@ -1162,6 +1162,514 @@ app.post("/rides/:rideId/confirm", validateJWT, async (req, res) => {
   }
 });
 
+// Driver matching algorithm endpoint
+app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
+  try {
+    const rideId = parseInt(req.params.rideId);
+
+    // Verify dispatcher/admin role
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('staff_profiles')
+      .select('user_id, org_id, role')
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    const hasDispatcherRole = profile.role && (
+      Array.isArray(profile.role) 
+        ? (profile.role.includes('Dispatcher') || profile.role.includes('Admin'))
+        : (profile.role === 'Dispatcher' || profile.role === 'Admin')
+    );
+
+    if (!hasDispatcherRole) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Get the ride details with client information
+    const { data: ride, error: rideError } = await supabaseAdmin
+      .from('rides')
+      .select(`
+        *,
+        clients:client_id (
+          service_animal,
+          service_animal_size_enum,
+          oxygen,
+          car_height_needed_enum,
+          zip_code,
+          street_address,
+          city,
+          state
+        )
+      `)
+      .eq('ride_id', rideId)
+      .eq('org_id', profile.org_id)
+      .single();
+
+    if (rideError || !ride) {
+      return res.status(404).json({ error: 'Ride not found' });
+    }
+
+    // Get all drivers in the organization
+    const { data: drivers, error: driversError } = await supabaseAdmin
+      .from('staff_profiles')
+      .select(`
+        user_id,
+        first_name,
+        last_name,
+        zipcode,
+        last_drove,
+        max_weekly_rides,
+        can_accept_service_animals,
+        town_preference,
+        destination_limitation,
+        vehicles:vehicles!vehicles_user_id_fkey (
+          vehicle_id,
+          nondriver_seats,
+          seat_height_enum,
+          type_of_vehicle_enum,
+          driver_status
+        )
+      `)
+      .eq('org_id', profile.org_id)
+      .contains('role', ['Driver']);
+
+    if (driversError) {
+      return res.status(500).json({ error: 'Failed to fetch drivers' });
+    }
+
+    // Get unavailability for all drivers
+    const rideDate = new Date(ride.appointment_time);
+    const rideDayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][rideDate.getDay()];
+    
+    const { data: unavailability, error: unavailError } = await supabaseAdmin
+      .from('driver_unavailability')
+      .select('*')
+      .in('user_id', drivers.map(d => d.user_id))
+      .or(`unavailable_date.eq.${rideDate.toISOString().split('T')[0]},repeating_day.eq.${rideDayOfWeek}`);
+
+    if (unavailError) {
+      console.error('Error fetching unavailability:', unavailError);
+    }
+
+    // Get recent ride counts for each driver (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const { data: recentRides, error: recentRidesError } = await supabaseAdmin
+      .from('rides')
+      .select('driver_user_id')
+      .in('driver_user_id', drivers.map(d => d.user_id))
+      .gte('appointment_time', sevenDaysAgo.toISOString())
+      .in('status', ['Scheduled', 'Assigned', 'In Progress', 'Completed']);
+
+    const recentRideCounts = {};
+    if (recentRides) {
+      recentRides.forEach(r => {
+        recentRideCounts[r.driver_user_id] = (recentRideCounts[r.driver_user_id] || 0) + 1;
+      });
+    }
+
+    // Match drivers
+    const rideTime = new Date(ride.appointment_time);
+    const rideHour = rideTime.getHours();
+    const rideMinute = rideTime.getMinutes();
+    const rideTimeString = `${String(rideHour).padStart(2, '0')}:${String(rideMinute).padStart(2, '0')}:00`;
+
+    const matchedDrivers = drivers.map(driver => {
+      const result = {
+        user_id: driver.user_id,
+        first_name: driver.first_name,
+        last_name: driver.last_name,
+        score: 0,
+        match_quality: 'excellent',
+        reasons: [],
+        exclusion_reasons: []
+      };
+
+      // HARD FILTERS
+
+      // 1. Check schedule availability
+      const driverUnavail = unavailability?.filter(u => u.user_id === driver.user_id) || [];
+      const isUnavailable = driverUnavail.some(u => {
+        if (u.all_day) return true;
+        if (u.start_time && u.end_time) {
+          return rideTimeString >= u.start_time && rideTimeString <= u.end_time;
+        }
+        return false;
+      });
+
+      if (isUnavailable) {
+        result.exclusion_reasons.push('Driver unavailable at requested time');
+        result.match_quality = 'excluded';
+        return result;
+      }
+
+      // 2. Check vehicle availability and capacity
+      const activeVehicles = driver.vehicles?.filter(v => v.driver_status === 'active') || [];
+      
+      if (activeVehicles.length === 0) {
+        result.exclusion_reasons.push('No active vehicle');
+        result.match_quality = 'excluded';
+        return result;
+      }
+
+      // Check capacity
+      const hasCapacity = activeVehicles.some(v => v.nondriver_seats >= (ride.riders || 1));
+      if (!hasCapacity) {
+        result.exclusion_reasons.push(`Insufficient capacity (needs ${ride.riders || 1} seats)`);
+        result.match_quality = 'excluded';
+        return result;
+      }
+
+      // 3. Check special requirements
+      if (ride.clients?.service_animal && !driver.can_accept_service_animals) {
+        result.exclusion_reasons.push('Cannot accommodate service animal');
+        result.match_quality = 'excluded';
+        return result;
+      }
+
+      if (ride.clients?.oxygen) {
+        // Assuming oxygen capability is not currently tracked, but could be added
+        // For now, we'll allow all drivers
+      }
+
+      // 4. Check vehicle height requirement
+      if (ride.clients?.car_height_needed_enum && ride.clients.car_height_needed_enum !== 'Standard') {
+        const hasRequiredHeight = activeVehicles.some(v => {
+          if (ride.clients.car_height_needed_enum === 'Tall') {
+            return v.seat_height_enum === 'High' || v.type_of_vehicle_enum === 'SUV';
+          }
+          return true;
+        });
+
+        if (!hasRequiredHeight) {
+          result.exclusion_reasons.push('Vehicle height requirement not met');
+          result.match_quality = 'excluded';
+          return result;
+        }
+      }
+
+      // 5. Geography check (simplified - check if same ZIP or nearby)
+      // In production, you'd use actual distance calculation or ZIP radius
+      const driverZip = String(driver.zipcode);
+      const pickupZip = ride.pickup_from_home ? ride.clients?.zip_code : ride.alt_pickup_zipcode;
+      const dropoffZip = ride.dropoff_zipcode;
+
+      // Simple proximity check (first 3 digits of ZIP)
+      const driverArea = driverZip.substring(0, 3);
+      const pickupArea = pickupZip?.substring(0, 3);
+      const dropoffArea = dropoffZip?.substring(0, 3);
+
+      const inServiceArea = driverArea === pickupArea || driverArea === dropoffArea;
+      
+      if (!inServiceArea) {
+        // Check destination limitations
+        if (driver.destination_limitation) {
+          result.exclusion_reasons.push('Outside service area');
+          result.match_quality = 'excluded';
+          return result;
+        }
+      }
+
+      // PASSED ALL HARD FILTERS - Calculate score
+
+      // Fairness: Rotation (last_drove) - most important
+      const lastDrove = driver.last_drove ? new Date(driver.last_drove).getTime() : 0;
+      const daysSinceLastDrive = lastDrove ? (Date.now() - lastDrove) / (1000 * 60 * 60 * 24) : 9999;
+      
+      // Score: 0-100 points for rotation
+      if (daysSinceLastDrive > 30) {
+        result.score += 100; // Haven't driven in over a month
+        result.reasons.push('High priority in rotation queue');
+      } else if (daysSinceLastDrive > 14) {
+        result.score += 75;
+        result.reasons.push('Medium priority in rotation queue');
+      } else if (daysSinceLastDrive > 7) {
+        result.score += 50;
+      } else {
+        result.score += Math.max(0, daysSinceLastDrive * 5); // 0-35 points
+      }
+
+      // Balance: Recent assignment count - 0-30 points
+      const recentCount = recentRideCounts[driver.user_id] || 0;
+      const maxWeekly = driver.max_weekly_rides || 10;
+      
+      if (recentCount === 0) {
+        result.score += 30;
+        result.reasons.push('No recent assignments');
+      } else if (recentCount < maxWeekly / 2) {
+        result.score += 20;
+      } else if (recentCount < maxWeekly) {
+        result.score += 10;
+      } else {
+        result.score += 0;
+        result.reasons.push(`Approaching weekly limit (${recentCount}/${maxWeekly})`);
+      }
+
+      // Proximity: Same ZIP area - 0-20 points
+      if (driverArea === pickupArea) {
+        result.score += 20;
+        result.reasons.push('Lives near pickup location');
+      } else if (driverArea === dropoffArea) {
+        result.score += 10;
+        result.reasons.push('Lives near dropoff location');
+      }
+
+      // Town preference match - 0-10 points
+      if (driver.town_preference) {
+        const preferredTowns = driver.town_preference.toLowerCase().split(',').map(t => t.trim());
+        const dropoffCity = ride.dropoff_city?.toLowerCase();
+        
+        if (preferredTowns.includes(dropoffCity)) {
+          result.score += 10;
+          result.reasons.push('Matches town preference');
+        }
+      }
+
+      // Determine match quality based on score
+      if (result.score >= 90) {
+        result.match_quality = 'excellent';
+      } else if (result.score >= 60) {
+        result.match_quality = 'good';
+      } else if (result.score >= 30) {
+        result.match_quality = 'fair';
+      } else {
+        result.match_quality = 'poor';
+      }
+
+      return result;
+    });
+
+    // Separate excluded and available drivers
+    const availableDrivers = matchedDrivers
+      .filter(d => d.match_quality !== 'excluded')
+      .sort((a, b) => b.score - a.score);
+
+    const excludedDrivers = matchedDrivers
+      .filter(d => d.match_quality === 'excluded')
+      .sort((a, b) => `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`));
+
+    res.json({
+      success: true,
+      available: availableDrivers,
+      excluded: excludedDrivers,
+      ride_requirements: {
+        riders: ride.riders || 1,
+        service_animal: ride.clients?.service_animal || false,
+        oxygen: ride.clients?.oxygen || false,
+        vehicle_height: ride.clients?.car_height_needed_enum,
+        appointment_time: ride.appointment_time
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in driver matching:', error);
+    res.status(500).json({ error: `Internal server error: ${error.message}` });
+  }
+});
+
+// Send ride request to selected driver
+app.post("/rides/:rideId/send-request", validateJWT, async (req, res) => {
+  try {
+    const rideId = parseInt(req.params.rideId);
+    const { driver_user_id } = req.body;
+
+    if (!driver_user_id) {
+      return res.status(400).json({ error: 'driver_user_id is required' });
+    }
+
+    // Verify dispatcher/admin role
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('staff_profiles')
+      .select('user_id, org_id, role')
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    const hasDispatcherRole = profile.role && (
+      Array.isArray(profile.role) 
+        ? (profile.role.includes('Dispatcher') || profile.role.includes('Admin'))
+        : (profile.role === 'Dispatcher' || profile.role === 'Admin')
+    );
+
+    if (!hasDispatcherRole) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    // Verify the ride exists
+    const { data: existingRide, error: rideError } = await supabaseAdmin
+      .from('rides')
+      .select('ride_id, org_id, status')
+      .eq('ride_id', rideId)
+      .eq('org_id', profile.org_id)
+      .single();
+
+    if (rideError || !existingRide) {
+      return res.status(404).json({ error: 'Ride not found or access denied' });
+    }
+
+    if (existingRide.status !== 'Requested') {
+      return res.status(400).json({ error: 'Can only send requests for rides with Requested status' });
+    }
+
+    // Verify the driver exists and is in the same org
+    const { data: driver, error: driverError } = await supabaseAdmin
+      .from('staff_profiles')
+      .select('user_id, org_id, role')
+      .eq('user_id', driver_user_id)
+      .eq('org_id', profile.org_id)
+      .single();
+
+    if (driverError || !driver) {
+      return res.status(404).json({ error: 'Driver not found' });
+    }
+
+    const hasDriverRole = driver.role && (
+      Array.isArray(driver.role) ? driver.role.includes('Driver') : driver.role === 'Driver'
+    );
+
+    if (!hasDriverRole) {
+      return res.status(400).json({ error: 'Selected user is not a driver' });
+    }
+
+    // Update the ride - assign driver and change status to Pending
+    const { error: updateError } = await supabaseAdmin
+      .from('rides')
+      .update({
+        driver_user_id: driver_user_id,
+        status: 'Pending' // New status for ride requests awaiting driver acceptance
+      })
+      .eq('ride_id', rideId);
+
+    if (updateError) {
+      console.error('Update error:', updateError);
+      return res.status(500).json({ error: `Failed to send ride request: ${updateError.message}` });
+    }
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('Error sending ride request:', error);
+    res.status(500).json({ error: `Internal server error: ${error.message}` });
+  }
+});
+
+// Driver accepts ride request
+app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
+  try {
+    const rideId = parseInt(req.params.rideId);
+
+    // Get the ride
+    const { data: ride, error: rideError } = await supabaseAdmin
+      .from('rides')
+      .select('ride_id, driver_user_id, status, vehicle_id')
+      .eq('ride_id', rideId)
+      .single();
+
+    if (rideError || !ride) {
+      return res.status(404).json({ error: 'Ride not found' });
+    }
+
+    // Verify the ride is assigned to this driver
+    if (ride.driver_user_id !== req.user.id) {
+      return res.status(403).json({ error: 'This ride is not assigned to you' });
+    }
+
+    if (ride.status !== 'Pending') {
+      return res.status(400).json({ error: 'Can only accept rides with Pending status' });
+    }
+
+    // Get driver's active vehicle if not already assigned
+    let vehicleId = ride.vehicle_id;
+    if (!vehicleId) {
+      const { data: vehicle } = await supabaseAdmin
+        .from('vehicles')
+        .select('vehicle_id')
+        .eq('user_id', req.user.id)
+        .eq('driver_status', 'active')
+        .limit(1)
+        .maybeSingle();
+
+      vehicleId = vehicle?.vehicle_id || null;
+    }
+
+    // Update ride to Scheduled and assign vehicle
+    const { error: updateError } = await supabaseAdmin
+      .from('rides')
+      .update({
+        status: 'Scheduled',
+        vehicle_id: vehicleId
+      })
+      .eq('ride_id', rideId);
+
+    if (updateError) {
+      console.error('Error accepting ride:', updateError);
+      return res.status(500).json({ error: 'Failed to accept ride' });
+    }
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('Error in ride acceptance:', error);
+    res.status(500).json({ error: `Internal server error: ${error.message}` });
+  }
+});
+
+// Driver declines ride request
+app.post("/rides/:rideId/decline", validateJWT, async (req, res) => {
+  try {
+    const rideId = parseInt(req.params.rideId);
+    const { reason } = req.body;
+
+    // Get the ride
+    const { data: ride, error: rideError } = await supabaseAdmin
+      .from('rides')
+      .select('ride_id, driver_user_id, status')
+      .eq('ride_id', rideId)
+      .single();
+
+    if (rideError || !ride) {
+      return res.status(404).json({ error: 'Ride not found' });
+    }
+
+    // Verify the ride is assigned to this driver
+    if (ride.driver_user_id !== req.user.id) {
+      return res.status(403).json({ error: 'This ride is not assigned to you' });
+    }
+
+    if (ride.status !== 'Pending') {
+      return res.status(400).json({ error: 'Can only decline rides with Pending status' });
+    }
+
+    // Update ride back to Requested and remove driver assignment
+    const { error: updateError } = await supabaseAdmin
+      .from('rides')
+      .update({
+        status: 'Requested',
+        driver_user_id: null,
+        notes: ride.notes ? `${ride.notes}\n[Driver declined: ${reason || 'No reason provided'}]` : `[Driver declined: ${reason || 'No reason provided'}]`
+      })
+      .eq('ride_id', rideId);
+
+    if (updateError) {
+      console.error('Error declining ride:', updateError);
+      return res.status(500).json({ error: 'Failed to decline ride' });
+    }
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('Error in ride decline:', error);
+    res.status(500).json({ error: `Internal server error: ${error.message}` });
+  }
+});
+
 app.listen(3000, () => console.log("Server ready on port 3000."));
 
 module.exports = app;
