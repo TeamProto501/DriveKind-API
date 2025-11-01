@@ -726,11 +726,12 @@ app.get("/transactions-audit-log/:id", validateJWT, async (req, res) => {
 });
 
 // Vehicles routes
-app.post("/vehicles", validateJWT, async (req, res) => {
+app.post("/vehicles", validateJWTWithOrg, async (req, res) => {
   try {
     const vehicleData = {
       ...req.body,
       user_id: req.user.id,
+      org_id: req.user.org_id, // ← REQUIRED for RLS/org scoping
     };
     /* const vehicle = await db.createVehicle(vehicleData, req.userToken); */
     const vehicle = await AuditLogger.auditCreate({
@@ -738,7 +739,7 @@ app.post("/vehicles", validateJWT, async (req, res) => {
       data: vehicleData,
       userId: req.userId || req.user.id,
       userToken: req.userToken,
-      idField: "id",
+      idField: "vehicle_id", // ← FIX
     });
     res.status(201).json(vehicle);
   } catch (error) {
@@ -783,7 +784,7 @@ app.put("/vehicles/:id", validateJWT, async (req, res) => {
       updates: req.body,
       userId: req.userId || req.user.id,
       userToken: req.userToken,
-      idField: "id",
+      idField: "vehicle_id", // ← FIX
     });
     if (!vehicle) {
       return res.status(404).json({ error: "Vehicle not found" });
@@ -803,7 +804,7 @@ app.delete("/vehicles/:id", validateJWT, async (req, res) => {
       id: req.params.id,
       userId: req.userId || req.user.id,
       userToken: req.userToken,
-      idField: "id",
+      idField: "vehicle_id", // ← FIX
     });
     res.status(204).send();
   } catch (error) {
