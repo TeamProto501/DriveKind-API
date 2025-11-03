@@ -171,12 +171,33 @@ const validateJWTWithOrg = [validateJWT, validateOrgAccess];
 // Admin Auth User Creation Endpoint
 app.post("/admin/create-auth-user", validateJWT, async (req, res) => {
   try {
-    const { email, password, first_name, last_name } = req.body;
+    const { email, password, first_name, last_name, profileData } = req.body;
 
     console.log("Creating auth user for:", email);
 
-    // Use admin client with service role key
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    // Verify admin role
+    const { data: adminProfile, error: adminProfileError } = await supabaseAdmin
+      .from('staff_profiles')
+      .select('user_id, org_id, role')
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (adminProfileError || !adminProfile) {
+      return res.status(404).json({ error: 'Admin profile not found' });
+    }
+
+    const hasAdminRole = adminProfile.role && (
+      Array.isArray(adminProfile.role) 
+        ? (adminProfile.role.includes('Admin') || adminProfile.role.includes('Super Admin'))
+        : (adminProfile.role === 'Admin' || adminProfile.role === 'Super Admin')
+    );
+
+    if (!hasAdminRole) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    // Create auth user with service role key
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
@@ -186,16 +207,84 @@ app.post("/admin/create-auth-user", validateJWT, async (req, res) => {
       },
     });
 
-    if (error) {
-      console.error("Auth creation error:", error);
-      return res.status(400).json({ error: error.message });
+    if (authError || !authData.user) {
+      console.error("Auth creation error:", authError);
+      return res.status(400).json({ error: authError?.message || 'Failed to create auth user' });
     }
 
-    console.log("Auth user created successfully:", data.user.id);
-    res.json({ user_id: data.user.id });
+    console.log("Auth user created successfully:", authData.user.id);
+
+    // Create staff profile if profileData provided
+    if (profileData) {
+      console.log("Creating staff profile for:", authData.user.id);
+      
+      const staffProfile = {
+        user_id: authData.user.id,
+        org_id: adminProfile.org_id, // Use admin's org_id
+        first_name,
+        last_name,
+        email,
+        dob: profileData.dob || new Date().toISOString().split('T')[0],
+        address: profileData.address || '',
+        zipcode: parseFloat(profileData.zipcode) || 0,
+        city: profileData.city || '',
+        state: profileData.state || 'NY',
+        user_name: email.split('@')[0],
+        primary_phone: profileData.primary_phone || '',
+        secondary_phone: profileData.secondary_phone || null,
+        primary_is_cell: profileData.primary_is_cell ?? true,
+        primary_can_text: profileData.primary_can_text ?? true,
+        secondary_is_cell: profileData.secondary_is_cell ?? false,
+        secondary_can_text: profileData.secondary_can_text ?? false,
+        role: profileData.role || ['Driver'],
+        address2: profileData.address2 || null,
+        town_preference: profileData.town_preference || null,
+        contact_pref_enum: profileData.contact_pref_enum || 'Phone',
+        start_date: new Date().toISOString().split('T')[0],
+        mileage_reimbursement: profileData.mileage_reimbursement ?? false,
+        training_completed: profileData.training_completed ?? true,
+        max_weekly_rides: profileData.max_weekly_rides || null,
+        can_accept_service_animals: profileData.can_accept_service_animals ?? true,
+        emergency_contact: profileData.emergency_contact || null,
+        emergency_reln: profileData.emergency_reln || null,
+        emergency_phone: profileData.emergency_phone || null,
+        destination_limitation: profileData.destination_limitation || null,
+        allergens: profileData.allergens || null,
+        driver_other_limitations: profileData.driver_other_limitations || null
+      };
+
+      const { data: newProfile, error: insertError } = await supabaseAdmin
+        .from('staff_profiles')
+        .insert([staffProfile])
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Profile insert error:', insertError);
+        // Rollback: delete auth user
+        console.log('Rolling back - deleting auth user:', authData.user.id);
+        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+        return res.status(500).json({ error: `Failed to create profile: ${insertError.message}` });
+      }
+
+      console.log('Staff profile created successfully');
+      
+      res.json({ 
+        success: true,
+        user_id: authData.user.id, 
+        profile: newProfile 
+      });
+    } else {
+      // No profile data - just return auth user
+      res.json({ 
+        success: true,
+        user_id: authData.user.id 
+      });
+    }
+
   } catch (error) {
     console.error("Error creating auth user:", error);
-    res.status(500).json({ error: "Failed to create auth user" });
+    res.status(500).json({ error: `Failed to create auth user: ${error.message}` });
   }
 });
 
