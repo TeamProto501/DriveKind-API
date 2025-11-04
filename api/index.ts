@@ -8,7 +8,7 @@ const { createClient } = require("@supabase/supabase-js");
 const { createServerClient } = require("@supabase/ssr");
 const cors = require("cors");
 
-const { v4: uuidv4 } = require("uuid");
+// const { v4: uuidv4 } = require("uuid");
 const { sendRideAssignedEmail } = require("./emailService")
 
 
