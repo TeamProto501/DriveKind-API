@@ -659,6 +659,30 @@ async function updateDriverRotationStats(driverId, userToken) {
 
 
 
+
+///
+///
+///
+///
+/// Email function
+async function getClientEmailAndProfile(clientId, userToken) {
+  const client = getSupabaseClient(userToken);
+  // Get client details using the client_id
+  return handle(
+    client
+      .from("clients")
+      .select("email, first_name, last_name")
+      .eq("client_id", clientId)
+      .single()
+  );
+}
+///
+///
+///
+///
+///
+
+
 module.exports = {
   supabase,
   getSupabaseClient,
@@ -718,6 +742,7 @@ module.exports = {
   getDriverRideStatsForSorting,
   recordMatchFailure,
   updateDriverRotationStats,
+  getClientEmailAndProfile
 };
 
 
