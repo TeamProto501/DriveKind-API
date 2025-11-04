@@ -1293,7 +1293,7 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
     }
 
     // Get the ride details with client information
-    // IMPORTANT: Service role bypasses RLS, but we still need to verify org ownership
+    // REMOVED car_height_needed_enum - column doesn't exist
     const { data: ride, error: rideError } = await supabaseAdmin
       .from('rides')
       .select(`
@@ -1302,7 +1302,6 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
           service_animal,
           service_animal_size_enum,
           oxygen,
-          car_height_needed_enum,
           zip_code,
           street_address,
           city,
@@ -1324,7 +1323,6 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
     }
 
     console.log('Matching drivers for ride:', rideId, 'in org:', profile.org_id);
-
 
     // Get all drivers in the organization
     const { data: drivers, error: driversError } = await supabaseAdmin
@@ -1352,7 +1350,7 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
 
     console.log(`Found ${drivers?.length || 0} drivers in organization`);
 
-    // Get ALL vehicles for these drivers (separate query for better control)
+    // Get ALL vehicles for these drivers
     const { data: allVehicles, error: vehiclesError } = await supabaseAdmin
       .from("vehicles")
       .select("*")
@@ -1367,7 +1365,6 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
 
     console.log(`Found ${allVehicles?.length || 0} total vehicles`);
 
-    // Log a sample vehicle to see the structure
     if (allVehicles && allVehicles.length > 0) {
       console.log("Sample vehicle:", JSON.stringify(allVehicles[0], null, 2));
     }
@@ -1383,10 +1380,10 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
       });
     }
 
-    // Log vehicle status breakdown (with actual enum values)
+    // Log vehicle status breakdown
     const vehicleStatusCounts = {};
     allVehicles?.forEach((v) => {
-      const status = v.driver_status; // Keep original case for counting
+      const status = v.driver_status;
       vehicleStatusCounts[status] = (vehicleStatusCounts[status] || 0) + 1;
     });
     console.log("Vehicle status breakdown:", vehicleStatusCounts);
@@ -1488,10 +1485,7 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
 
       // 2. Check vehicle availability and capacity
       const driverVehicles = vehiclesByUser[driver.user_id] || [];
-
-      // Filter for Active vehicles (matching the enum exactly)
       const activeVehicles = driverVehicles.filter((v) => {
-        // Handle both 'Active' and 'active' just in case
         const status = v.driver_status;
         return status === "Active" || status === "active";
       });
@@ -1500,7 +1494,6 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
         `Driver ${driver.first_name} ${driver.last_name} (${driver.user_id}): ${driverVehicles.length} total vehicles, ${activeVehicles.length} active`
       );
 
-      // Log the actual statuses if there are vehicles but none active
       if (driverVehicles.length > 0 && activeVehicles.length === 0) {
         console.log(
           `  Vehicle statuses: ${driverVehicles
@@ -1544,38 +1537,11 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
       }
 
       if (ride.clients?.oxygen) {
-        // Assuming oxygen capability is not currently tracked, but could be added
+        // Assuming oxygen capability is not currently tracked
         // For now, we'll allow all drivers
       }
 
-      // 4. Check vehicle height requirement
-      if (
-        ride.clients?.car_height_needed_enum &&
-        ride.clients.car_height_needed_enum !== "Standard" &&
-        ride.clients.car_height_needed_enum !== "low"
-      ) {
-        const hasRequiredHeight = activeVehicles.some((v) => {
-          if (
-            ride.clients.car_height_needed_enum === "Tall" ||
-            ride.clients.car_height_needed_enum === "high"
-          ) {
-            return (
-              v.seat_height_enum === "High" ||
-              v.seat_height_enum === "high" ||
-              v.type_of_vehicle_enum === "SUV"
-            );
-          }
-          return true;
-        });
-
-        if (!hasRequiredHeight) {
-          result.exclusion_reasons.push("Vehicle height requirement not met");
-          result.match_quality = "excluded";
-          return result;
-        }
-      }
-
-      // 5. Geography check (simplified - check if same ZIP or nearby)
+      // 4. Geography check (simplified - check if same ZIP or nearby)
       const driverZip = String(driver.zipcode);
       const pickupZip = ride.pickup_from_home
         ? ride.clients?.zip_code
@@ -1649,17 +1615,22 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
         result.reasons.push("Lives near dropoff location");
       }
 
-      // Town preference match - 0-10 points
+      // CHANGED: Town preference now matches PICKUP location instead of dropoff
+      // Drivers without preference won't be excluded, just miss bonus points
       if (driver.town_preference) {
         const preferredTowns = driver.town_preference
           .toLowerCase()
           .split(",")
           .map((t) => t.trim());
-        const dropoffCity = ride.dropoff_city?.toLowerCase();
+        
+        // Get pickup city (from client home or alternate pickup)
+        const pickupCity = ride.pickup_from_home
+          ? ride.clients?.city?.toLowerCase()
+          : ride.alt_pickup_city?.toLowerCase();
 
-        if (preferredTowns.includes(dropoffCity)) {
+        if (pickupCity && preferredTowns.includes(pickupCity)) {
           result.score += 10;
-          result.reasons.push("Matches town preference");
+          result.reasons.push("Matches town preference (pickup location)");
         }
       }
 
@@ -1702,7 +1673,6 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
         riders: ride.riders || 1,
         service_animal: ride.clients?.service_animal || false,
         oxygen: ride.clients?.oxygen || false,
-        vehicle_height: ride.clients?.car_height_needed_enum,
         appointment_time: ride.appointment_time,
       },
     });
