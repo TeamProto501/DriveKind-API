@@ -1486,8 +1486,7 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
       // 2. Check vehicle availability and capacity
       const driverVehicles = vehiclesByUser[driver.user_id] || [];
       const activeVehicles = driverVehicles.filter((v) => {
-        const status = v.driver_status;
-        return status === "Active" || status === "active";
+        return v.active === true;
       });
 
       console.log(
@@ -1496,8 +1495,8 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
 
       if (driverVehicles.length > 0 && activeVehicles.length === 0) {
         console.log(
-          `  Vehicle statuses: ${driverVehicles
-            .map((v) => v.driver_status)
+          `  Vehicle active flags: ${driverVehicles
+            .map((v) => v.active ? 'active' : 'inactive')
             .join(", ")}`
         );
       }
@@ -1506,11 +1505,11 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
         if (driverVehicles.length === 0) {
           result.exclusion_reasons.push("No vehicle registered");
         } else {
-          const statuses = driverVehicles
-            .map((v) => v.driver_status)
+          const activeFlags = driverVehicles
+            .map((v) => v.active ? 'active' : 'inactive')
             .join(", ");
           result.exclusion_reasons.push(
-            `No active vehicle (has ${driverVehicles.length} vehicle(s) with status: ${statuses})`
+            `No active vehicle (has ${driverVehicles.length} vehicle(s): ${activeFlags})`
           );
         }
         result.match_quality = "excluded";
