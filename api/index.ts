@@ -1273,30 +1273,30 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
 
     // Verify dispatcher/admin role
     const { data: profile, error: profileError } = await supabaseAdmin
-      .from("staff_profiles")
-      .select("user_id, org_id, role")
-      .eq("user_id", req.user.id)
+      .from('staff_profiles')
+      .select('user_id, org_id, role')
+      .eq('user_id', req.user.id)
       .single();
 
     if (profileError || !profile) {
-      return res.status(404).json({ error: "Profile not found" });
+      return res.status(404).json({ error: 'Profile not found' });
     }
 
-    const hasDispatcherRole =
-      profile.role &&
-      (Array.isArray(profile.role)
-        ? profile.role.includes("Dispatcher") || profile.role.includes("Admin")
-        : profile.role === "Dispatcher" || profile.role === "Admin");
+    const hasDispatcherRole = profile.role && (
+      Array.isArray(profile.role) 
+        ? (profile.role.includes('Dispatcher') || profile.role.includes('Admin'))
+        : (profile.role === 'Dispatcher' || profile.role === 'Admin')
+    );
 
     if (!hasDispatcherRole) {
-      return res.status(403).json({ error: "Access denied" });
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     // Get the ride details with client information
+    // IMPORTANT: Service role bypasses RLS, but we still need to verify org ownership
     const { data: ride, error: rideError } = await supabaseAdmin
-      .from("rides")
-      .select(
-        `
+      .from('rides')
+      .select(`
         *,
         clients:client_id (
           service_animal,
@@ -1308,17 +1308,23 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
           city,
           state
         )
-      `
-      )
-      .eq("ride_id", rideId)
-      .eq("org_id", profile.org_id)
+      `)
+      .eq('ride_id', rideId)
       .single();
 
     if (rideError || !ride) {
-      return res.status(404).json({ error: "Ride not found" });
+      console.error('Ride fetch error:', rideError);
+      return res.status(404).json({ error: 'Ride not found' });
     }
 
-    console.log("Matching drivers for ride:", rideId);
+    // Verify the ride belongs to the dispatcher's organization
+    if (ride.org_id !== profile.org_id) {
+      console.error(`Org mismatch: ride org ${ride.org_id} vs user org ${profile.org_id}`);
+      return res.status(403).json({ error: 'Access denied: ride not in your organization' });
+    }
+
+    console.log('Matching drivers for ride:', rideId, 'in org:', profile.org_id);
+
 
     // Get all drivers in the organization
     const { data: drivers, error: driversError } = await supabaseAdmin
