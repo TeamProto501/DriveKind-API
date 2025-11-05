@@ -1787,10 +1787,10 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
     console.log(`Ride ID: ${rideId}`);
     console.log(`User ID: ${userId}`);
 
-    // Get the ride
+    // Get the ride - REMOVED vehicle_id from select
     const { data: ride, error: rideError } = await supabaseAdmin
       .from("rides")
-      .select("ride_id, driver_user_id, status, vehicle_id, org_id")
+      .select("ride_id, driver_user_id, status, org_id")
       .eq("ride_id", rideId)
       .single();
 
@@ -1803,7 +1803,6 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
 
     console.log(`Ride driver_user_id: ${ride.driver_user_id}`);
     console.log(`Current user_id: ${userId}`);
-    console.log(`Match: ${ride.driver_user_id === userId}`);
 
     // Verify the ride is assigned to this driver
     if (ride.driver_user_id !== userId) {
@@ -1820,27 +1819,11 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
         .json({ error: `Can only accept rides with Pending status. Current status: ${ride.status}` });
     }
 
-    // Get driver's active vehicle if not already assigned
-    let vehicleId = ride.vehicle_id;
-    if (!vehicleId) {
-      const { data: vehicle } = await supabaseAdmin
-        .from("vehicles")
-        .select("vehicle_id")
-        .eq("user_id", userId)
-        .eq("active", true) // Changed from driver_status to active
-        .limit(1)
-        .maybeSingle();
-
-      vehicleId = vehicle?.vehicle_id || null;
-      console.log(`Assigned vehicle: ${vehicleId}`);
-    }
-
-    // Update ride to Scheduled and assign vehicle
+    // Update ride to Scheduled - REMOVED vehicle_id from update
     const { error: updateError } = await supabaseAdmin
       .from("rides")
       .update({
-        status: "Scheduled",
-        vehicle_id: vehicleId,
+        status: "Scheduled"
       })
       .eq("ride_id", rideId);
 
