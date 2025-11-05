@@ -1781,29 +1781,43 @@ app.post("/rides/:rideId/send-request", validateJWT, async (req, res) => {
 app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
   try {
     const rideId = parseInt(req.params.rideId);
+    const userId = req.user.id;
+
+    console.log(`=== ACCEPT RIDE ===`);
+    console.log(`Ride ID: ${rideId}`);
+    console.log(`User ID: ${userId}`);
 
     // Get the ride
     const { data: ride, error: rideError } = await supabaseAdmin
       .from("rides")
-      .select("ride_id, driver_user_id, status, vehicle_id")
+      .select("ride_id, driver_user_id, status, vehicle_id, org_id")
       .eq("ride_id", rideId)
       .single();
+
+    console.log(`Ride found:`, ride);
+    console.log(`Ride error:`, rideError);
 
     if (rideError || !ride) {
       return res.status(404).json({ error: "Ride not found" });
     }
 
+    console.log(`Ride driver_user_id: ${ride.driver_user_id}`);
+    console.log(`Current user_id: ${userId}`);
+    console.log(`Match: ${ride.driver_user_id === userId}`);
+
     // Verify the ride is assigned to this driver
-    if (ride.driver_user_id !== req.user.id) {
+    if (ride.driver_user_id !== userId) {
       return res
         .status(403)
         .json({ error: "This ride is not assigned to you" });
     }
 
+    console.log(`Current status: ${ride.status}`);
+
     if (ride.status !== "Pending") {
       return res
         .status(400)
-        .json({ error: "Can only accept rides with Pending status" });
+        .json({ error: `Can only accept rides with Pending status. Current status: ${ride.status}` });
     }
 
     // Get driver's active vehicle if not already assigned
@@ -1812,12 +1826,13 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
       const { data: vehicle } = await supabaseAdmin
         .from("vehicles")
         .select("vehicle_id")
-        .eq("user_id", req.user.id)
-        .eq("driver_status", "active")
+        .eq("user_id", userId)
+        .eq("active", true) // Changed from driver_status to active
         .limit(1)
         .maybeSingle();
 
       vehicleId = vehicle?.vehicle_id || null;
+      console.log(`Assigned vehicle: ${vehicleId}`);
     }
 
     // Update ride to Scheduled and assign vehicle
@@ -1834,6 +1849,7 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
       return res.status(500).json({ error: "Failed to accept ride" });
     }
 
+    console.log(`Ride ${rideId} accepted successfully`);
     res.json({ success: true });
   } catch (error) {
     console.error("Error in ride acceptance:", error);
