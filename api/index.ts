@@ -1681,6 +1681,59 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
   }
 });
 
+// GET /rides/:rideId/requests  -> list {driver_id, denied} for a ride (scoped to dispatcher's org)
+app.get("/rides/:rideId/requests", validateJWT, async (req, res) => {
+  try {
+    const rideId = parseInt(req.params.rideId);
+
+    // Dispatcher/admin + org check
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("staff_profiles")
+      .select("user_id, org_id, role")
+      .eq("user_id", req.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    const hasDispatcherRole =
+      profile.role &&
+      (Array.isArray(profile.role)
+        ? profile.role.includes("Dispatcher") || profile.role.includes("Admin")
+        : profile.role === "Dispatcher" || profile.role === "Admin");
+
+    if (!hasDispatcherRole) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // Confirm ride belongs to same org
+    const { data: ride, error: rideError } = await supabaseAdmin
+      .from("rides")
+      .select("ride_id, org_id")
+      .eq("ride_id", rideId)
+      .eq("org_id", profile.org_id)
+      .single();
+
+    if (rideError || !ride) {
+      return res.status(404).json({ error: "Ride not found or access denied" });
+    }
+
+    // Read requests
+    const { data, error } = await supabaseAdmin
+      .from("ride_requests")
+      .select("driver_id, denied")
+      .eq("ride_id", rideId);
+
+    if (error) return res.status(500).json({ error: error.message });
+
+    res.json({ success: true, requests: data ?? [] });
+  } catch (e:any) {
+    console.error(e);
+    res.status(500).json({ error: e.message || "Unexpected error" });
+  }
+});
+
 // Send ride request to selected driver
 app.post("/rides/:rideId/send-request", validateJWT, async (req, res) => {
   try {
@@ -1712,7 +1765,7 @@ app.post("/rides/:rideId/send-request", validateJWT, async (req, res) => {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    // Verify the ride exists
+    // Verify the ride is in this org and in Requestable state
     const { data: existingRide, error: rideError } = await supabaseAdmin
       .from("rides")
       .select("ride_id, org_id, status")
@@ -1724,15 +1777,13 @@ app.post("/rides/:rideId/send-request", validateJWT, async (req, res) => {
       return res.status(404).json({ error: "Ride not found or access denied" });
     }
 
-    if (existingRide.status !== "Requested") {
+    if (existingRide.status !== "Requested" && existingRide.status !== "Pending") {
       return res
         .status(400)
-        .json({
-          error: "Can only send requests for rides with Requested status",
-        });
+        .json({ error: "Can only send requests for rides with Requested or Pending status" });
     }
 
-    // Verify the driver exists and is in the same org
+    // Verify the driver exists, is in same org, and has Driver role
     const { data: driver, error: driverError } = await supabaseAdmin
       .from("staff_profiles")
       .select("user_id, org_id, role")
@@ -1754,25 +1805,90 @@ app.post("/rides/:rideId/send-request", validateJWT, async (req, res) => {
       return res.status(400).json({ error: "Selected user is not a driver" });
     }
 
-    // Update the ride - assign driver and change status to Pending
+    // 1) Upsert into ride_requests (store pending request)
+    const { error: reqUpsertError } = await supabaseAdmin
+      .from("ride_requests")
+      .upsert(
+        [
+          {
+            ride_id: rideId,
+            org_id: profile.org_id,
+            driver_id: driver_user_id,
+            denied: false,           // sending = pending
+          },
+        ],
+        { onConflict: "ride_id,driver_id" }
+      );
+
+    if (reqUpsertError) {
+      console.error("ride_requests upsert error:", reqUpsertError);
+      return res.status(500).json({ error: "Failed to create ride request row" });
+    }
+
+    // 2) Mark ride Pending and tag the currently requested driver
     const { error: updateError } = await supabaseAdmin
       .from("rides")
       .update({
         driver_user_id: driver_user_id,
-        status: "Pending", // New status for ride requests awaiting driver acceptance
+        status: "Pending",
       })
       .eq("ride_id", rideId);
 
     if (updateError) {
-      console.error("Update error:", updateError);
-      return res
-        .status(500)
-        .json({ error: `Failed to send ride request: ${updateError.message}` });
+      console.error("Update ride error:", updateError);
+      return res.status(500).json({ error: "Failed to set ride Pending" });
     }
 
     res.json({ success: true });
   } catch (error) {
     console.error("Error sending ride request:", error);
+    res.status(500).json({ error: `Internal server error: ${error.message}` });
+  }
+});
+
+// List request statuses for a ride (used by modal)
+app.get("/rides/:rideId/requests", validateJWT, async (req, res) => {
+  try {
+    const rideId = parseInt(req.params.rideId);
+
+    // Identify caller org
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("staff_profiles")
+      .select("user_id, org_id, role")
+      .eq("user_id", req.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    // Ensure the ride belongs to this org
+    const { data: ride, error: rideError } = await supabaseAdmin
+      .from("rides")
+      .select("ride_id, org_id")
+      .eq("ride_id", rideId)
+      .eq("org_id", profile.org_id)
+      .single();
+
+    if (rideError || !ride) {
+      return res.status(404).json({ error: "Ride not found or access denied" });
+    }
+
+    // Return minimal shape used by the frontend
+    const { data: requests, error: reqError } = await supabaseAdmin
+      .from("ride_requests")
+      .select("driver_id, denied")
+      .eq("ride_id", rideId)
+      .eq("org_id", profile.org_id);
+
+    if (reqError) {
+      console.error("Fetch ride_requests error:", reqError);
+      return res.status(500).json({ error: "Failed to fetch ride requests" });
+    }
+
+    res.json(requests || []);
+  } catch (error) {
+    console.error("Error loading ride requests:", error);
     res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
 });
@@ -1849,7 +1965,7 @@ app.post("/rides/:rideId/decline", validateJWT, async (req, res) => {
     // Get the ride
     const { data: ride, error: rideError } = await supabaseAdmin
       .from("rides")
-      .select("ride_id, driver_user_id, status")
+      .select("ride_id, driver_user_id, status, org_id, notes")
       .eq("ride_id", rideId)
       .single();
 
@@ -1859,9 +1975,7 @@ app.post("/rides/:rideId/decline", validateJWT, async (req, res) => {
 
     // Verify the ride is assigned to this driver
     if (ride.driver_user_id !== req.user.id) {
-      return res
-        .status(403)
-        .json({ error: "This ride is not assigned to you" });
+      return res.status(403).json({ error: "This ride is not assigned to you" });
     }
 
     if (ride.status !== "Pending") {
@@ -1870,17 +1984,30 @@ app.post("/rides/:rideId/decline", validateJWT, async (req, res) => {
         .json({ error: "Can only decline rides with Pending status" });
     }
 
-    // Update ride back to Requested and remove driver assignment
+    // 1) Mark the specific request as denied
+    const { error: reqUpdateErr } = await supabaseAdmin
+      .from("ride_requests")
+      .update({ denied: true })
+      .eq("ride_id", rideId)
+      .eq("org_id", ride.org_id)
+      .eq("driver_id", req.user.id);
+
+    if (reqUpdateErr) {
+      console.error("ride_requests update (deny) error:", reqUpdateErr);
+      // non-fatal; continue to reset the ride
+    }
+
+    // 2) Update ride back to Requested and clear assignment
+    const newNotes = ride.notes
+      ? `${ride.notes}\n[Driver declined: ${reason || "No reason provided"}]`
+      : `[Driver declined: ${reason || "No reason provided"}]`;
+
     const { error: updateError } = await supabaseAdmin
       .from("rides")
       .update({
         status: "Requested",
         driver_user_id: null,
-        notes: ride.notes
-          ? `${ride.notes}\n[Driver declined: ${
-              reason || "No reason provided"
-            }]`
-          : `[Driver declined: ${reason || "No reason provided"}]`,
+        notes: newNotes,
       })
       .eq("ride_id", rideId);
 
