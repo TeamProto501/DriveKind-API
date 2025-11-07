@@ -557,7 +557,7 @@ app.post("/rides/:ride_id/assign", validateJWT, async (req, res) => {
       .from("vehicles")
       .select("vehicle_id")
       .eq("user_id", driver_user_id)
-      .eq("driver_status", "active")
+      .eq("driver_status", true)
       .limit(1)
       .maybeSingle();
 
@@ -1267,7 +1267,7 @@ app.post("/rides/:rideId/confirm", validateJWT, async (req, res) => {
 });
 
 // Driver matching algorithm endpoint
-app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
+const matchDriversHandler = async (req, res) => {
   try {
     const rideId = parseInt(req.params.rideId);
 
@@ -1679,7 +1679,10 @@ app.post("/rides/:rideId/match-drivers", validateJWT, async (req, res) => {
     console.error("Error in driver matching:", error);
     res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
-});
+};
+
+app.post("/rides/:rideId/match-drivers", validateJWT, matchDriversHandler);
+app.post("/dispatcher/:orgId/rides/:rideId/match-drivers", validateJWT, matchDriversHandler);
 
 // GET /rides/:rideId/requests  -> list {driver_id, denied} for a ride (scoped to dispatcher's org)
 app.get("/rides/:rideId/requests", validateJWT, async (req, res) => {
@@ -1821,54 +1824,6 @@ app.post("/rides/:rideId/send-request", validateJWT, async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error("Error sending ride request:", error);
-    res.status(500).json({ error: `Internal server error: ${error.message}` });
-  }
-});
-
-
-// List request statuses for a ride (used by modal)
-app.get("/rides/:rideId/requests", validateJWT, async (req, res) => {
-  try {
-    const rideId = parseInt(req.params.rideId);
-
-    // Identify caller org
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from("staff_profiles")
-      .select("user_id, org_id, role")
-      .eq("user_id", req.user.id)
-      .single();
-
-    if (profileError || !profile) {
-      return res.status(404).json({ error: "Profile not found" });
-    }
-
-    // Ensure the ride belongs to this org
-    const { data: ride, error: rideError } = await supabaseAdmin
-      .from("rides")
-      .select("ride_id, org_id")
-      .eq("ride_id", rideId)
-      .eq("org_id", profile.org_id)
-      .single();
-
-    if (rideError || !ride) {
-      return res.status(404).json({ error: "Ride not found or access denied" });
-    }
-
-    // Return minimal shape used by the frontend
-    const { data: requests, error: reqError } = await supabaseAdmin
-      .from("ride_requests")
-      .select("driver_id, denied")
-      .eq("ride_id", rideId)
-      .eq("org_id", profile.org_id);
-
-    if (reqError) {
-      console.error("Fetch ride_requests error:", reqError);
-      return res.status(500).json({ error: "Failed to fetch ride requests" });
-    }
-
-    res.json(requests || []);
-  } catch (error) {
-    console.error("Error loading ride requests:", error);
     res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
 });
