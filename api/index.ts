@@ -1898,13 +1898,13 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
 });
 
 // Driver declines ride request (leave ride in Requested)
+// Robust to either 'denied' or 'declined' column
 app.post("/rides/:rideId/decline", validateJWT, async (req, res) => {
   try {
-    const rideId = parseInt(req.params.rideId);
+    const rideId = parseInt(req.params.rideId, 10);
     const driverId = req.user.id;
-    const { reason } = req.body;
 
-    // Driver profile
+    // Driver profile check
     const { data: profile, error: profileErr } = await supabaseAdmin
       .from("staff_profiles")
       .select("user_id, org_id, role")
@@ -1915,10 +1915,20 @@ app.post("/rides/:rideId/decline", validateJWT, async (req, res) => {
       return res.status(404).json({ error: "Profile not found" });
     }
 
-    // Ride in same org
+    const isDriver =
+      profile.role &&
+      (Array.isArray(profile.role)
+        ? profile.role.includes("Driver")
+        : profile.role === "Driver");
+
+    if (!isDriver) {
+      return res.status(403).json({ error: "Driver role required" });
+    }
+
+    // Ride must exist in same org
     const { data: ride, error: rideError } = await supabaseAdmin
       .from("rides")
-      .select("ride_id, org_id, notes, status")
+      .select("ride_id, org_id, status, notes")
       .eq("ride_id", rideId)
       .eq("org_id", profile.org_id)
       .single();
@@ -1927,51 +1937,61 @@ app.post("/rides/:rideId/decline", validateJWT, async (req, res) => {
       return res.status(404).json({ error: "Ride not found or access denied" });
     }
 
-    // Must have a pending request for THIS driver
+    // There must be a pending request for THIS driver
+    // Select both fields so we can be agnostic to schema
     const { data: requestRow, error: reqErr } = await supabaseAdmin
       .from("ride_requests")
-      .select("ride_id, driver_id, denied")
+      .select("ride_id, driver_id, org_id, denied, declined")
       .eq("ride_id", rideId)
       .eq("org_id", profile.org_id)
       .eq("driver_id", driverId)
       .single();
 
-    if (reqErr || !requestRow || requestRow.denied === true) {
-      return res.status(400).json({ error: "No pending request to decline" });
+    if (reqErr || !requestRow) {
+      return res.status(400).json({ error: "No ride request found for this driver" });
     }
 
-    // 1) Mark request as denied
-    const { error: reqUpdateErr } = await supabaseAdmin
-      .from("ride_requests")
-      .update({ denied: true })
-      .eq("ride_id", rideId)
-      .eq("org_id", profile.org_id)
-      .eq("driver_id", driverId);
+    // Determine current pending state (treat null/undefined as pending)
+    const currentlyDenied =
+      requestRow.denied === true || requestRow.declined === true;
 
-    if (reqUpdateErr) {
-      console.error("ride_requests update (deny) error:", reqUpdateErr);
-      return res.status(500).json({ error: "Failed to mark request denied" });
+    if (currentlyDenied) {
+      return res.status(400).json({ error: "Request already declined" });
     }
 
-    // 2) Keep ride in Requested. Optionally add a note.
-    const newNotes = ride.notes
-      ? `${ride.notes}\n[Driver declined (${driverId}): ${reason || "No reason provided"}]`
-      : `[Driver declined (${driverId}): ${reason || "No reason provided"}]`;
+    // Helper: attempt update with a field; on 42703 (undefined column), try the other
+    const setFlagTrue = async () => {
+      // 1) Try 'declined'
+      let resp = await supabaseAdmin
+        .from("ride_requests")
+        .update({ declined: true })
+        .eq("ride_id", rideId)
+        .eq("org_id", profile.org_id)
+        .eq("driver_id", driverId);
 
-    const { error: rideNoteErr } = await supabaseAdmin
-      .from("rides")
-      .update({ notes: newNotes })
-      .eq("ride_id", rideId);
+      if (resp.error && resp.error.code === "42703") {
+        // 2) Fallback to 'denied'
+        resp = await supabaseAdmin
+          .from("ride_requests")
+          .update({ denied: true })
+          .eq("ride_id", rideId)
+          .eq("org_id", profile.org_id)
+          .eq("driver_id", driverId);
+      }
+      return resp;
+    };
 
-    if (rideNoteErr) {
-      console.error("Error updating ride notes after decline:", rideNoteErr);
-      // not fatal
+    const { error: flagErr } = await setFlagTrue();
+    if (flagErr) {
+      console.error("ride_requests update (decline) error:", flagErr);
+      return res.status(500).json({ error: "Failed to mark request declined" });
     }
 
-    res.json({ success: true });
+    // Keep ride in Requested (no status change). We won’t add notes.
+    return res.json({ success: true });
   } catch (error) {
     console.error("Error in ride decline:", error);
-    res.status(500).json({ error: `Internal server error: ${error.message}` });
+    return res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
 });
 
