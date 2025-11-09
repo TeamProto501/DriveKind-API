@@ -1911,13 +1911,30 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
       .eq("ride_id", rideId);
     if (updateErr) return res.status(500).json({ error: "Failed to accept ride" });
 
+    // ✅ CANCEL ALL OTHER PENDING REQUESTS FOR THIS RIDE
+    const { error: cancelErr } = await supabaseAdmin
+      .from("ride_requests")
+      .update({ 
+        denied: true,
+        updated_at: new Date().toISOString()
+      })
+      .eq("ride_id", rideId)
+      .eq("denied", false)
+      .neq("driver_id", driverId); // Don't cancel the accepting driver's request
+
+    if (cancelErr) {
+      // Log but don't fail the acceptance - ride is already assigned
+      console.error("Error cancelling other ride requests:", cancelErr);
+    } else {
+      console.log(`Cancelled other pending requests for ride ${rideId}`);
+    }
+
     res.json({ success: true });
   } catch (error) {
     console.error("Error in ride acceptance:", error);
     res.status(500).json({ error: `Internal server error: ${error.message}` });
   }
 });
-
 
 // Driver declines ride request (leave ride in Requested; mark request denied)
 app.post("/rides/:rideId/decline", validateJWT, async (req, res) => {
