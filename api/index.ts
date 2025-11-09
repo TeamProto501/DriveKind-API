@@ -196,6 +196,16 @@ app.post("/admin/create-auth-user", validateJWT, async (req, res) => {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
+    // Check if email already exists BEFORE trying to create
+    const { data: existingUser } = await supabaseAdmin.auth.admin.listUsers();
+    const emailExists = existingUser?.users?.some(u => u.email?.toLowerCase() === email.toLowerCase());
+    
+    if (emailExists) {
+      return res.status(400).json({ 
+        error: `Email address ${email} is already registered. Please use a different email or contact support if you believe this is an error.` 
+      });
+    }
+
     // Create auth user with service role key
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -209,7 +219,18 @@ app.post("/admin/create-auth-user", validateJWT, async (req, res) => {
 
     if (authError || !authData.user) {
       console.error("Auth creation error:", authError);
-      return res.status(400).json({ error: authError?.message || 'Failed to create auth user' });
+      
+      // Better error messages for common issues
+      let errorMsg = authError?.message || 'Failed to create auth user';
+      if (errorMsg.toLowerCase().includes('already registered') || errorMsg.toLowerCase().includes('already exists')) {
+        errorMsg = `Email address ${email} is already registered. Please use a different email.`;
+      } else if (errorMsg.toLowerCase().includes('invalid email')) {
+        errorMsg = `Invalid email format: ${email}`;
+      } else if (errorMsg.toLowerCase().includes('password')) {
+        errorMsg = `Password does not meet requirements: ${errorMsg}`;
+      }
+      
+      return res.status(400).json({ error: errorMsg });
     }
 
     console.log("Auth user created successfully:", authData.user.id);
@@ -220,7 +241,7 @@ app.post("/admin/create-auth-user", validateJWT, async (req, res) => {
       
       const staffProfile = {
         user_id: authData.user.id,
-        org_id: adminProfile.org_id, // Use admin's org_id
+        org_id: adminProfile.org_id,
         first_name,
         last_name,
         email,
@@ -250,7 +271,8 @@ app.post("/admin/create-auth-user", validateJWT, async (req, res) => {
         emergency_phone: profileData.emergency_phone || null,
         destination_limitation: profileData.destination_limitation || null,
         allergens: profileData.allergens || null,
-        driver_other_limitations: profileData.driver_other_limitations || null
+        driver_other_limitations: profileData.driver_other_limitations || null,
+        gender: profileData.gender || 'Other' // ← Add this
       };
 
       const { data: newProfile, error: insertError } = await supabaseAdmin
@@ -261,10 +283,15 @@ app.post("/admin/create-auth-user", validateJWT, async (req, res) => {
 
       if (insertError) {
         console.error('Profile insert error:', insertError);
-        // Rollback: delete auth user
         console.log('Rolling back - deleting auth user:', authData.user.id);
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-        return res.status(500).json({ error: `Failed to create profile: ${insertError.message}` });
+        
+        let errorMsg = insertError.message;
+        if (errorMsg.includes('duplicate key') || errorMsg.includes('unique constraint')) {
+          errorMsg = 'A profile with this information already exists.';
+        }
+        
+        return res.status(500).json({ error: `Failed to create profile: ${errorMsg}` });
       }
 
       console.log('Staff profile created successfully');
@@ -275,7 +302,6 @@ app.post("/admin/create-auth-user", validateJWT, async (req, res) => {
         profile: newProfile 
       });
     } else {
-      // No profile data - just return auth user
       res.json({ 
         success: true,
         user_id: authData.user.id 
