@@ -472,10 +472,10 @@ async function getDriverRideStats(userId, startDate, endDate, userToken) {
 
   const { data: rides, error } = await client
     .from("rides")
-    .select("ride_id, status, pickup_date")
+    .select("ride_id, status, pickup_time")
     .eq("driver_user_id", userId)
-    .gte("pickup_date", startDate)
-    .lte("pickup_date", endDate);
+    .gte("pickup_time", startDate)
+    .lte("pickup_time", endDate);
 
   if (error) {
     console.error("Error fetching rides:", error);
