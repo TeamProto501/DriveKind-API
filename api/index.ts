@@ -1331,7 +1331,8 @@ const matchDriversHandler = async (req, res) => {
           zip_code,
           street_address,
           city,
-          state
+          state,
+          mobility_assistance_enum
         )
       `)
       .eq('ride_id', rideId)
@@ -1363,7 +1364,8 @@ const matchDriversHandler = async (req, res) => {
         max_weekly_rides,
         can_accept_service_animals,
         town_preference,
-        destination_limitation
+        destination_limitation,
+        cannot_handle_mobility_devices
       `
       )
       .eq("org_id", profile.org_id)
@@ -1566,7 +1568,21 @@ const matchDriversHandler = async (req, res) => {
         // For now, we'll allow all drivers
       }
 
-      // 4. Geography check (simplified - check if same ZIP or nearby)
+      // 4. HARD FILTER: Check mobility device limitations
+      const clientMobilityDevice = ride.clients?.mobility_assistance_enum;
+      if (clientMobilityDevice && driver.cannot_handle_mobility_devices) {
+        // Check if client's mobility device is in driver's cannot_handle array
+        if (Array.isArray(driver.cannot_handle_mobility_devices) && 
+            driver.cannot_handle_mobility_devices.includes(clientMobilityDevice)) {
+          result.exclusion_reasons.push(
+            `Driver cannot handle ${clientMobilityDevice} mobility devices`
+          );
+          result.match_quality = "excluded";
+          return result;
+        }
+      }
+
+      // 5. Geography check (simplified - check if same ZIP or nearby)
       const driverZip = String(driver.zipcode);
       const pickupZip = ride.pickup_from_home
         ? ride.clients?.zip_code
@@ -1698,6 +1714,7 @@ const matchDriversHandler = async (req, res) => {
         riders: ride.riders || 1,
         service_animal: ride.clients?.service_animal || false,
         oxygen: ride.clients?.oxygen || false,
+        mobility_assistance_enum: ride.clients?.mobility_assistance_enum || null,
         appointment_time: ride.appointment_time,
       },
     });
