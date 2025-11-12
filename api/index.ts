@@ -1319,7 +1319,6 @@ const matchDriversHandler = async (req, res) => {
     }
 
     // Get the ride details with client information
-    // REMOVED car_height_needed_enum - column doesn't exist
     const { data: ride, error: rideError } = await supabaseAdmin
       .from('rides')
       .select(`
@@ -1327,12 +1326,15 @@ const matchDriversHandler = async (req, res) => {
         clients:client_id (
           service_animal,
           service_animal_size_enum,
-          oxygen,
+          oxygen_type,
           zip_code,
           street_address,
           city,
           state,
-          mobility_assistance_enum
+          mobility_assistance_enum,
+          acceptable_vehicle_types,
+          allergies,
+          other_limitations
         )
       `)
       .eq('ride_id', rideId)
@@ -1351,11 +1353,10 @@ const matchDriversHandler = async (req, res) => {
 
     console.log('Matching drivers for ride:', rideId, 'in org:', profile.org_id);
 
-    // Get all drivers in the organization
+    // Get all drivers in the organization with new fields
     const { data: drivers, error: driversError } = await supabaseAdmin
       .from("staff_profiles")
-      .select(
-        `
+      .select(`
         user_id,
         first_name,
         last_name,
@@ -1365,9 +1366,11 @@ const matchDriversHandler = async (req, res) => {
         can_accept_service_animals,
         town_preference,
         destination_limitation,
-        cannot_handle_mobility_devices
-      `
-      )
+        cannot_handle_mobility_devices,
+        can_accommodate_oxygen_types,
+        allergens,
+        driver_other_limitations
+      `)
       .eq("org_id", profile.org_id)
       .contains("role", ["Driver"]);
 
@@ -1382,20 +1385,13 @@ const matchDriversHandler = async (req, res) => {
     const { data: allVehicles, error: vehiclesError } = await supabaseAdmin
       .from("vehicles")
       .select("*")
-      .in(
-        "user_id",
-        drivers.map((d) => d.user_id)
-      );
+      .in("user_id", drivers.map((d) => d.user_id));
 
     if (vehiclesError) {
       console.error("Error fetching vehicles:", vehiclesError);
     }
 
     console.log(`Found ${allVehicles?.length || 0} total vehicles`);
-
-    if (allVehicles && allVehicles.length > 0) {
-      console.log("Sample vehicle:", JSON.stringify(allVehicles[0], null, 2));
-    }
 
     // Create a map of user_id to their vehicles
     const vehiclesByUser = {};
@@ -1408,78 +1404,59 @@ const matchDriversHandler = async (req, res) => {
       });
     }
 
-    // Log vehicle status breakdown
-    const vehicleStatusCounts = {};
-    allVehicles?.forEach((v) => {
-      const status = v.driver_status;
-      vehicleStatusCounts[status] = (vehicleStatusCounts[status] || 0) + 1;
-    });
-    console.log("Vehicle status breakdown:", vehicleStatusCounts);
-
     // Get unavailability for all drivers
     const rideDate = new Date(ride.appointment_time);
     const rideDayOfWeek = [
-      "Sunday",
-      "Monday",
-      "Tuesday",
-      "Wednesday",
-      "Thursday",
-      "Friday",
-      "Saturday",
+      "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
     ][rideDate.getDay()];
+
+    // Calculate ride end time (default 1 hour unless estimated_appointment_length specified)
+    const rideDurationMinutes = ride.estimated_appointment_length || 60;
+    const rideEndTime = new Date(rideDate.getTime() + rideDurationMinutes * 60000);
 
     const { data: unavailability, error: unavailError } = await supabaseAdmin
       .from("driver_unavailability")
       .select("*")
-      .in(
-        "user_id",
-        drivers.map((d) => d.user_id)
-      )
-      .or(
-        `unavailable_date.eq.${
-          rideDate.toISOString().split("T")[0]
-        },repeating_day.eq.${rideDayOfWeek}`
-      );
+      .in("user_id", drivers.map((d) => d.user_id))
+      .or(`unavailable_date.eq.${rideDate.toISOString().split("T")[0]},repeating_day.eq.${rideDayOfWeek}`);
 
     if (unavailError) {
       console.error("Error fetching unavailability:", unavailError);
     }
 
-    // Get recent ride counts for each driver (last 7 days)
+    // Get recent ride counts for each driver (last 7 days for weekly count)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const { data: recentRides, error: recentRidesError } = await supabaseAdmin
       .from("rides")
       .select("driver_user_id")
-      .in(
-        "driver_user_id",
-        drivers.map((d) => d.user_id)
-      )
+      .in("driver_user_id", drivers.map((d) => d.user_id))
       .gte("appointment_time", sevenDaysAgo.toISOString())
-      .in("status", [
-        "Scheduled",
-        "Assigned",
-        "In Progress",
-        "Completed",
-        "Pending",
-      ]);
+      .in("status", ["Scheduled", "Assigned", "In Progress", "Completed", "Pending"]);
 
     const recentRideCounts = {};
     if (recentRides) {
       recentRides.forEach((r) => {
-        recentRideCounts[r.driver_user_id] =
-          (recentRideCounts[r.driver_user_id] || 0) + 1;
+        recentRideCounts[r.driver_user_id] = (recentRideCounts[r.driver_user_id] || 0) + 1;
       });
     }
 
+    // Get pickup and dropoff locations
+    const pickupCity = ride.pickup_from_home 
+      ? ride.clients?.city?.toLowerCase()
+      : ride.alt_pickup_city?.toLowerCase();
+    
+    const dropoffCity = ride.dropoff_city?.toLowerCase();
+
     // Match drivers
-    const rideTime = new Date(ride.appointment_time);
-    const rideHour = rideTime.getHours();
-    const rideMinute = rideTime.getMinutes();
-    const rideTimeString = `${String(rideHour).padStart(2, "0")}:${String(
-      rideMinute
-    ).padStart(2, "0")}:00`;
+    const rideStartHour = rideDate.getHours();
+    const rideStartMinute = rideDate.getMinutes();
+    const rideEndHour = rideEndTime.getHours();
+    const rideEndMinute = rideEndTime.getMinutes();
+
+    const rideStartTimeString = `${String(rideStartHour).padStart(2, "0")}:${String(rideStartMinute).padStart(2, "0")}:00`;
+    const rideEndTimeString = `${String(rideEndHour).padStart(2, "0")}:${String(rideEndMinute).padStart(2, "0")}:00`;
 
     const matchedDrivers = drivers.map((driver) => {
       const result = {
@@ -1490,133 +1467,167 @@ const matchDriversHandler = async (req, res) => {
         match_quality: "excellent",
         reasons: [],
         exclusion_reasons: [],
+        driver_other_limitations: driver.driver_other_limitations || null,
+        town_preference_category: 3 // Default: no match
       };
 
-      // HARD FILTERS
+      // ==================== HARD FILTERS ====================
 
-      // 1. Check schedule availability
-      const driverUnavail =
-        unavailability?.filter((u) => u.user_id === driver.user_id) || [];
+      // 1. Check unavailability (intersecting or touching the ride time window)
+      const driverUnavail = unavailability?.filter((u) => u.user_id === driver.user_id) || [];
       const isUnavailable = driverUnavail.some((u) => {
         if (u.all_day) return true;
         if (u.start_time && u.end_time) {
-          return rideTimeString >= u.start_time && rideTimeString <= u.end_time;
+          // Check if unavailability intersects or touches ride window
+          return !(u.end_time < rideStartTimeString || u.start_time > rideEndTimeString);
         }
         return false;
       });
 
       if (isUnavailable) {
-        result.exclusion_reasons.push("Driver unavailable at requested time");
+        result.exclusion_reasons.push("Driver unavailable during ride time window");
         result.match_quality = "excluded";
         return result;
       }
 
-      // 2. Check vehicle availability and capacity
-      const driverVehicles = vehiclesByUser[driver.user_id] || [];
-      const activeVehicles = driverVehicles.filter((v) => {
-        return v.active === true;
-      });
-
-      console.log(
-        `Driver ${driver.first_name} ${driver.last_name} (${driver.user_id}): ${driverVehicles.length} total vehicles, ${activeVehicles.length} active`
-      );
-
-      if (driverVehicles.length > 0 && activeVehicles.length === 0) {
-        console.log(
-          `  Vehicle active flags: ${driverVehicles
-            .map((v) => v.active ? 'active' : 'inactive')
-            .join(", ")}`
-        );
+      // 2. Check destination limitation
+      if (driver.destination_limitation) {
+        const allowedDestinations = driver.destination_limitation
+          .toLowerCase()
+          .split(",")
+          .map((d) => d.trim());
+        
+        const destinationCity = ride.destination_name?.toLowerCase() || dropoffCity;
+        
+        if (destinationCity && !allowedDestinations.some(d => destinationCity.includes(d))) {
+          result.exclusion_reasons.push(`Destination outside allowed areas (${driver.destination_limitation})`);
+          result.match_quality = "excluded";
+          return result;
+        }
       }
+
+      // 3. Check vehicle availability and type matching
+      const driverVehicles = vehiclesByUser[driver.user_id] || [];
+      const activeVehicles = driverVehicles.filter((v) => v.active === true);
 
       if (activeVehicles.length === 0) {
         if (driverVehicles.length === 0) {
           result.exclusion_reasons.push("No vehicle registered");
         } else {
-          const activeFlags = driverVehicles
-            .map((v) => v.active ? 'active' : 'inactive')
-            .join(", ");
-          result.exclusion_reasons.push(
-            `No active vehicle (has ${driverVehicles.length} vehicle(s): ${activeFlags})`
-          );
+          result.exclusion_reasons.push("No active vehicle");
         }
         result.match_quality = "excluded";
         return result;
       }
 
-      // Check capacity
-      const hasCapacity = activeVehicles.some(
-        (v) => v.nondriver_seats >= (ride.riders || 1)
+      // Check vehicle type matching
+      const clientAcceptableTypes = ride.clients?.acceptable_vehicle_types || [];
+      const acceptsAllTypes = clientAcceptableTypes.includes('All') || clientAcceptableTypes.length === 0;
+      
+      const hasMatchingVehicle = acceptsAllTypes || activeVehicles.some(v => 
+        clientAcceptableTypes.includes(v.type_of_vehicle_enum)
       );
-      if (!hasCapacity) {
+
+      if (!hasMatchingVehicle) {
         result.exclusion_reasons.push(
-          `Insufficient capacity (needs ${ride.riders || 1} seats)`
+          `Vehicle type mismatch (client needs: ${clientAcceptableTypes.join(', ')})`
         );
         result.match_quality = "excluded";
         return result;
       }
 
-      // 3. Check special requirements
+      // 4. Check weekly ride limit
+      const recentCount = recentRideCounts[driver.user_id] || 0;
+      const maxWeekly = driver.max_weekly_rides || 999;
+
+      if (recentCount >= maxWeekly) {
+        result.exclusion_reasons.push(`Weekly ride limit reached (${recentCount}/${maxWeekly})`);
+        result.match_quality = "excluded";
+        return result;
+      }
+
+      // 5. Check service animal compatibility
       if (ride.clients?.service_animal && !driver.can_accept_service_animals) {
         result.exclusion_reasons.push("Cannot accommodate service animal");
         result.match_quality = "excluded";
         return result;
       }
 
-      if (ride.clients?.oxygen) {
-        // Assuming oxygen capability is not currently tracked
-        // For now, we'll allow all drivers
-      }
-
-      // 4. HARD FILTER: Check mobility device limitations
-      const clientMobilityDevice = ride.clients?.mobility_assistance_enum;
-      if (clientMobilityDevice && driver.cannot_handle_mobility_devices) {
-        // Check if client's mobility device is in driver's cannot_handle array
-        if (Array.isArray(driver.cannot_handle_mobility_devices) && 
-            driver.cannot_handle_mobility_devices.includes(clientMobilityDevice)) {
+      // 6. Check allergies
+      if (ride.clients?.allergies && driver.allergens) {
+        const clientAllergies = ride.clients.allergies.toLowerCase().split(',').map(a => a.trim());
+        const driverAllergens = driver.allergens.toLowerCase().split(',').map(a => a.trim());
+        
+        const conflictingAllergens = clientAllergies.filter(a => driverAllergens.includes(a));
+        
+        if (conflictingAllergens.length > 0) {
           result.exclusion_reasons.push(
-            `Driver cannot handle ${clientMobilityDevice} mobility devices`
+            `Allergen conflict: ${conflictingAllergens.join(', ')}`
           );
           result.match_quality = "excluded";
           return result;
         }
       }
 
-      // 5. Geography check (simplified - check if same ZIP or nearby)
-      const driverZip = String(driver.zipcode);
-      const pickupZip = ride.pickup_from_home
-        ? ride.clients?.zip_code
-        : ride.alt_pickup_zipcode;
-      const dropoffZip = ride.dropoff_zipcode;
-
-      // Simple proximity check (first 3 digits of ZIP)
-      const driverArea = driverZip.substring(0, 3);
-      const pickupArea = pickupZip?.substring(0, 3);
-      const dropoffArea = dropoffZip?.substring(0, 3);
-
-      const inServiceArea =
-        driverArea === pickupArea || driverArea === dropoffArea;
-
-      if (!inServiceArea) {
-        // Check destination limitations
-        if (driver.destination_limitation) {
-          result.exclusion_reasons.push("Outside service area");
+      // 7. Check oxygen type accommodation
+      if (ride.clients?.oxygen_type) {
+        const driverCanHandleOxygen = driver.can_accommodate_oxygen_types || [];
+        
+        if (!driverCanHandleOxygen.includes(ride.clients.oxygen_type)) {
+          result.exclusion_reasons.push(
+            `Cannot accommodate ${ride.clients.oxygen_type} oxygen`
+          );
           result.match_quality = "excluded";
           return result;
         }
       }
 
-      // PASSED ALL HARD FILTERS - Calculate score
+      // 8. Check mobility device compatibility
+      const clientMobilityDevice = ride.clients?.mobility_assistance_enum;
+      if (clientMobilityDevice && driver.cannot_handle_mobility_devices) {
+        if (Array.isArray(driver.cannot_handle_mobility_devices) && 
+            driver.cannot_handle_mobility_devices.includes(clientMobilityDevice)) {
+          result.exclusion_reasons.push(
+            `Cannot handle ${clientMobilityDevice} mobility device`
+          );
+          result.match_quality = "excluded";
+          return result;
+        }
+      }
 
-      // Fairness: Rotation (last_drove) - most important
-      const lastDrove = driver.last_drove
-        ? new Date(driver.last_drove).getTime()
-        : 0;
+      // ==================== QUALITY FILTERS ====================
+      // PASSED ALL HARD FILTERS
+
+      // 1. Town Preference Matching (determines sort group)
+      if (driver.town_preference) {
+        const preferredTowns = driver.town_preference
+          .toLowerCase()
+          .split(",")
+          .map((t) => t.trim());
+        
+        const pickupMatch = pickupCity && preferredTowns.some(t => pickupCity.includes(t));
+        const dropoffMatch = dropoffCity && preferredTowns.some(t => dropoffCity.includes(t));
+        
+        if (pickupMatch && dropoffMatch) {
+          result.town_preference_category = 1; // Best: both match
+          result.score += 30;
+          result.reasons.push("Matches town preference for both pickup and dropoff");
+        } else if (pickupMatch || dropoffMatch) {
+          result.town_preference_category = 2; // Good: one matches
+          result.score += 15;
+          result.reasons.push("Matches town preference for pickup or dropoff");
+        } else {
+          result.town_preference_category = 3; // No match
+        }
+      }
+
+      // 2. Last drove timestamp (for sorting within town preference groups)
+      const lastDrove = driver.last_drove ? new Date(driver.last_drove).getTime() : 0;
       const daysSinceLastDrive = lastDrove
         ? (Date.now() - lastDrove) / (1000 * 60 * 60 * 24)
         : 9999;
 
-      // Score: 0-100 points for rotation
+      // Score for rotation fairness
       if (daysSinceLastDrive > 30) {
         result.score += 100;
         result.reasons.push("High priority in rotation queue");
@@ -1629,50 +1640,14 @@ const matchDriversHandler = async (req, res) => {
         result.score += Math.max(0, daysSinceLastDrive * 5);
       }
 
-      // Balance: Recent assignment count - 0-30 points
-      const recentCount = recentRideCounts[driver.user_id] || 0;
-      const maxWeekly = driver.max_weekly_rides || 10;
-
+      // 3. Recent assignment balance
       if (recentCount === 0) {
-        result.score += 30;
-        result.reasons.push("No recent assignments");
-      } else if (recentCount < maxWeekly / 2) {
         result.score += 20;
-      } else if (recentCount < maxWeekly) {
+        result.reasons.push("No recent assignments this week");
+      } else if (recentCount < maxWeekly / 2) {
         result.score += 10;
       } else {
-        result.score += 0;
-        result.reasons.push(
-          `Approaching weekly limit (${recentCount}/${maxWeekly})`
-        );
-      }
-
-      // Proximity: Same ZIP area - 0-20 points
-      if (driverArea === pickupArea) {
-        result.score += 20;
-        result.reasons.push("Lives near pickup location");
-      } else if (driverArea === dropoffArea) {
-        result.score += 10;
-        result.reasons.push("Lives near dropoff location");
-      }
-
-      // CHANGED: Town preference now matches PICKUP location instead of dropoff
-      // Drivers without preference won't be excluded, just miss bonus points
-      if (driver.town_preference) {
-        const preferredTowns = driver.town_preference
-          .toLowerCase()
-          .split(",")
-          .map((t) => t.trim());
-        
-        // Get pickup city (from client home or alternate pickup)
-        const pickupCity = ride.pickup_from_home
-          ? ride.clients?.city?.toLowerCase()
-          : ride.alt_pickup_city?.toLowerCase();
-
-        if (pickupCity && preferredTowns.includes(pickupCity)) {
-          result.score += 10;
-          result.reasons.push("Matches town preference (pickup location)");
-        }
+        result.reasons.push(`${recentCount}/${maxWeekly} rides this week`);
       }
 
       // Determine match quality based on score
@@ -1689,17 +1664,22 @@ const matchDriversHandler = async (req, res) => {
       return result;
     });
 
-    // Separate excluded and available drivers
+    // Sort available drivers by town preference category, then by last_drove
     const availableDrivers = matchedDrivers
       .filter((d) => d.match_quality !== "excluded")
-      .sort((a, b) => b.score - a.score);
+      .sort((a, b) => {
+        // First sort by town preference category (1, 2, 3)
+        if (a.town_preference_category !== b.town_preference_category) {
+          return a.town_preference_category - b.town_preference_category;
+        }
+        // Within same category, sort by last drove (older first, which means higher score)
+        return b.score - a.score;
+      });
 
     const excludedDrivers = matchedDrivers
       .filter((d) => d.match_quality === "excluded")
       .sort((a, b) =>
-        `${a.first_name} ${a.last_name}`.localeCompare(
-          `${b.first_name} ${b.last_name}`
-        )
+        `${a.first_name} ${a.last_name}`.localeCompare(`${b.first_name} ${b.last_name}`)
       );
 
     console.log(
@@ -1713,9 +1693,14 @@ const matchDriversHandler = async (req, res) => {
       ride_requirements: {
         riders: ride.riders || 1,
         service_animal: ride.clients?.service_animal || false,
-        oxygen: ride.clients?.oxygen || false,
+        oxygen_type: ride.clients?.oxygen_type || null,
         mobility_assistance_enum: ride.clients?.mobility_assistance_enum || null,
+        acceptable_vehicle_types: ride.clients?.acceptable_vehicle_types || [],
         appointment_time: ride.appointment_time,
+        estimated_duration_minutes: rideDurationMinutes,
+        pickup_city: pickupCity,
+        dropoff_city: dropoffCity,
+        client_other_limitations: ride.clients?.other_limitations || null
       },
     });
   } catch (error) {
