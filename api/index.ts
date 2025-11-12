@@ -1318,7 +1318,7 @@ const matchDriversHandler = async (req, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Get the ride details with client information
+    // Get the ride details with client information (using existing fields)
     const { data: ride, error: rideError } = await supabaseAdmin
       .from('rides')
       .select(`
@@ -1326,14 +1326,14 @@ const matchDriversHandler = async (req, res) => {
         clients:client_id (
           service_animal,
           service_animal_size_enum,
-          oxygen_type,
+          oxygen,
           zip_code,
           street_address,
           city,
           state,
           mobility_assistance_enum,
-          acceptable_vehicle_types,
           allergies,
+          other_allergies,
           other_limitations
         )
       `)
@@ -1345,15 +1345,13 @@ const matchDriversHandler = async (req, res) => {
       return res.status(404).json({ error: 'Ride not found' });
     }
 
-    // Verify the ride belongs to the dispatcher's organization
     if (ride.org_id !== profile.org_id) {
-      console.error(`Org mismatch: ride org ${ride.org_id} vs user org ${profile.org_id}`);
       return res.status(403).json({ error: 'Access denied: ride not in your organization' });
     }
 
     console.log('Matching drivers for ride:', rideId, 'in org:', profile.org_id);
 
-    // Get all drivers in the organization with new fields
+    // Get all drivers in the organization
     const { data: drivers, error: driversError } = await supabaseAdmin
       .from("staff_profiles")
       .select(`
@@ -1366,10 +1364,7 @@ const matchDriversHandler = async (req, res) => {
         can_accept_service_animals,
         town_preference,
         destination_limitation,
-        cannot_handle_mobility_devices,
-        can_accommodate_oxygen_types,
-        allergens,
-        driver_other_limitations
+        cannot_handle_mobility_devices
       `)
       .eq("org_id", profile.org_id)
       .contains("role", ["Driver"]);
@@ -1391,9 +1386,6 @@ const matchDriversHandler = async (req, res) => {
       console.error("Error fetching vehicles:", vehiclesError);
     }
 
-    console.log(`Found ${allVehicles?.length || 0} total vehicles`);
-
-    // Create a map of user_id to their vehicles
     const vehiclesByUser = {};
     if (allVehicles) {
       allVehicles.forEach((vehicle) => {
@@ -1467,7 +1459,6 @@ const matchDriversHandler = async (req, res) => {
         match_quality: "excellent",
         reasons: [],
         exclusion_reasons: [],
-        driver_other_limitations: driver.driver_other_limitations || null,
         town_preference_category: 3 // Default: no match
       };
 
@@ -1506,7 +1497,7 @@ const matchDriversHandler = async (req, res) => {
         }
       }
 
-      // 3. Check vehicle availability and type matching
+      // 3. Check vehicle availability
       const driverVehicles = vehiclesByUser[driver.user_id] || [];
       const activeVehicles = driverVehicles.filter((v) => v.active === true);
 
@@ -1516,22 +1507,6 @@ const matchDriversHandler = async (req, res) => {
         } else {
           result.exclusion_reasons.push("No active vehicle");
         }
-        result.match_quality = "excluded";
-        return result;
-      }
-
-      // Check vehicle type matching
-      const clientAcceptableTypes = ride.clients?.acceptable_vehicle_types || [];
-      const acceptsAllTypes = clientAcceptableTypes.includes('All') || clientAcceptableTypes.length === 0;
-      
-      const hasMatchingVehicle = acceptsAllTypes || activeVehicles.some(v => 
-        clientAcceptableTypes.includes(v.type_of_vehicle_enum)
-      );
-
-      if (!hasMatchingVehicle) {
-        result.exclusion_reasons.push(
-          `Vehicle type mismatch (client needs: ${clientAcceptableTypes.join(', ')})`
-        );
         result.match_quality = "excluded";
         return result;
       }
@@ -1553,36 +1528,7 @@ const matchDriversHandler = async (req, res) => {
         return result;
       }
 
-      // 6. Check allergies
-      if (ride.clients?.allergies && driver.allergens) {
-        const clientAllergies = ride.clients.allergies.toLowerCase().split(',').map(a => a.trim());
-        const driverAllergens = driver.allergens.toLowerCase().split(',').map(a => a.trim());
-        
-        const conflictingAllergens = clientAllergies.filter(a => driverAllergens.includes(a));
-        
-        if (conflictingAllergens.length > 0) {
-          result.exclusion_reasons.push(
-            `Allergen conflict: ${conflictingAllergens.join(', ')}`
-          );
-          result.match_quality = "excluded";
-          return result;
-        }
-      }
-
-      // 7. Check oxygen type accommodation
-      if (ride.clients?.oxygen_type) {
-        const driverCanHandleOxygen = driver.can_accommodate_oxygen_types || [];
-        
-        if (!driverCanHandleOxygen.includes(ride.clients.oxygen_type)) {
-          result.exclusion_reasons.push(
-            `Cannot accommodate ${ride.clients.oxygen_type} oxygen`
-          );
-          result.match_quality = "excluded";
-          return result;
-        }
-      }
-
-      // 8. Check mobility device compatibility
+      // 6. Check mobility device compatibility
       const clientMobilityDevice = ride.clients?.mobility_assistance_enum;
       if (clientMobilityDevice && driver.cannot_handle_mobility_devices) {
         if (Array.isArray(driver.cannot_handle_mobility_devices) && 
@@ -1595,8 +1541,12 @@ const matchDriversHandler = async (req, res) => {
         }
       }
 
+      // 7. Oxygen requirement (simple boolean check for now)
+      if (ride.clients?.oxygen) {
+        result.reasons.push("Client requires oxygen - verify driver can accommodate");
+      }
+
       // ==================== QUALITY FILTERS ====================
-      // PASSED ALL HARD FILTERS
 
       // 1. Town Preference Matching (determines sort group)
       if (driver.town_preference) {
@@ -1672,7 +1622,7 @@ const matchDriversHandler = async (req, res) => {
         if (a.town_preference_category !== b.town_preference_category) {
           return a.town_preference_category - b.town_preference_category;
         }
-        // Within same category, sort by last drove (older first, which means higher score)
+        // Within same category, sort by score (which includes last_drove)
         return b.score - a.score;
       });
 
@@ -1693,13 +1643,14 @@ const matchDriversHandler = async (req, res) => {
       ride_requirements: {
         riders: ride.riders || 1,
         service_animal: ride.clients?.service_animal || false,
-        oxygen_type: ride.clients?.oxygen_type || null,
+        oxygen: ride.clients?.oxygen || false,
         mobility_assistance_enum: ride.clients?.mobility_assistance_enum || null,
-        acceptable_vehicle_types: ride.clients?.acceptable_vehicle_types || [],
         appointment_time: ride.appointment_time,
         estimated_duration_minutes: rideDurationMinutes,
         pickup_city: pickupCity,
         dropoff_city: dropoffCity,
+        client_allergies: ride.clients?.allergies || null,
+        client_other_allergies: ride.clients?.other_allergies || null,
         client_other_limitations: ride.clients?.other_limitations || null
       },
     });
