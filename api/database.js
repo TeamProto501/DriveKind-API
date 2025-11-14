@@ -406,12 +406,14 @@ async function getCallTableForLog(userToken) {
   const client = getSupabaseClient(userToken);
   const data = await handle(
     client.from("calls").select(`
+        call_id,
         call_time,
         call_type,
         other_type,
         phone_number,
         forwarded_to_name,
         forwarded_to_date,
+        client_id,
         caller_first_name,
         caller_last_name,
         staff_profile:user_id (
@@ -420,14 +422,17 @@ async function getCallTableForLog(userToken) {
         )
       `)
   );
+
   if (data) {
     return data.map((call) => ({
+      call_id: call.call_id,
       call_time: call.call_time,
       call_type: call.call_type,
       other_type: call.other_type,
       phone_number: call.phone_number,
       forwarded_to_name: call.forwarded_to_name,
       forwarded_to_date: call.forwarded_to_date,
+      client_id: call.client_id,
       staff_name: call.staff_profile
         ? `${call.staff_profile.first_name} ${call.staff_profile.last_name}`.trim()
         : null,

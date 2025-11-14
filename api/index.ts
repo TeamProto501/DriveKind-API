@@ -620,24 +620,35 @@ app.post("/calls", validateJWTWithOrg, async (req, res) => {
       phone_number,
       call_type,
       call_time,
-      staff_name,
       forwarded_to_name,
-      notes,
+      notes,        // not in table, but we accept it so UI doesn't break
+      client_id,    // optional, from UI when callerMode = "client"
     } = req.body || {};
 
+    // Split caller_name into first + last for the table columns
+    let caller_first_name = null;
+    let caller_last_name = null;
+
+    if (caller_name && caller_name.trim()) {
+      const parts = caller_name.trim().split(" ");
+      caller_first_name = parts[0] || null;
+      caller_last_name = parts.slice(1).join(" ") || null;
+    }
+
     const callData = {
-      caller_name: caller_name || null,
+      caller_first_name,
+      caller_last_name,
       phone_number: phone_number || null,
       call_type: call_type || null,
-      call_time: call_time || null,
-      staff_name: staff_name || null,
+      call_time: call_time || null, // string from datetime-local is fine
       forwarded_to_name: forwarded_to_name || null,
-      notes: notes || null,
       org_id: req.user.org_id,
-      user_id: req.user.id,
+      user_id: req.user.id, // staff who took the call
     };
 
-    console.log("Creating call with data:", callData);
+    if (client_id) {
+      callData.client_id = Number(client_id);
+    }
 
     const call = await AuditLogger.auditCreate({
       tableName: "calls",
@@ -649,15 +660,12 @@ app.post("/calls", validateJWTWithOrg, async (req, res) => {
 
     res.status(201).json(call);
   } catch (error) {
-    const err = error as any; // <-- key line
+    const err = error as any;
 
     console.error("Error creating call:", err);
 
     const message =
-      err?.message ??
-      err?.details ??
-      err?.hint ??
-      "Failed to create call";
+      err?.message ?? err?.details ?? err?.hint ?? "Failed to create call";
 
     res.status(500).json({ error: message });
   }
@@ -689,22 +697,62 @@ app.get("/calls/:id", validateJWT, async (req, res) => {
 
 app.put("/calls/:id", validateJWT, async (req, res) => {
   try {
-    /*  const call = await db.updateCall(req.params.id, req.body, req.userToken); */
+    const callId = parseInt(req.params.id, 10);
+
+    const {
+      caller_name,
+      phone_number,
+      call_type,
+      call_time,
+      forwarded_to_name,
+      notes,        // ignored at DB level
+      client_id,
+    } = req.body || {};
+
+    let caller_first_name = null;
+    let caller_last_name = null;
+
+    if (caller_name && caller_name.trim()) {
+      const parts = caller_name.trim().split(" ");
+      caller_first_name = parts[0] || null;
+      caller_last_name = parts.slice(1).join(" ") || null;
+    }
+
+    const updates: any = {
+      caller_first_name,
+      caller_last_name,
+      phone_number: phone_number || null,
+      call_type: call_type || null,
+      call_time: call_time || null,
+      forwarded_to_name: forwarded_to_name || null,
+    };
+
+    if (client_id) {
+      updates.client_id = Number(client_id);
+    }
+
     const call = await AuditLogger.auditUpdate({
       tableName: "calls",
-      id: req.params.id,
-      updates: req.body,
+      id: callId,
+      updates,
       userId: req.userId || req.user.id,
       userToken: req.userToken,
       idField: "call_id",
     });
+
     if (!call) {
       return res.status(404).json({ error: "Call not found" });
     }
+
     res.json(call);
   } catch (error) {
-    console.error("Error updating call:", error);
-    res.status(500).json({ error: "Failed to update call" });
+    const err = error as any;
+    console.error("Error updating call:", err);
+
+    const message =
+      err?.message ?? err?.details ?? err?.hint ?? "Failed to update call";
+
+    res.status(500).json({ error: message });
   }
 });
 
