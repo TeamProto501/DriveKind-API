@@ -426,7 +426,6 @@ async function getCallTableForLog(userToken) {
       other_type: call.other_type,
       phone_number: call.phone_number,
       forwarded_to_name: call.forwarded_to_name,
-      forwarded_to_date: call.forwarded_to_date,
       staff_name: call.staff_profile
         ? `${call.staff_profile.first_name} ${call.staff_profile.last_name}`.trim()
         : null,
