@@ -411,7 +411,6 @@ async function getCallTableForLog(userToken) {
         other_type,
         phone_number,
         forwarded_to_name,
-        forwarded_to_date,
         caller_first_name,
         caller_last_name,
         staff_profile:user_id (
