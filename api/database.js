@@ -48,6 +48,7 @@ async function handle(result) {
     throw err;
   }
 }
+
 // Client CRUD operations
 async function createClient(clientData, userToken) {
   const client = getSupabaseClient(userToken);
@@ -125,6 +126,7 @@ async function createDriverUnavailability(unavailabilityData, userToken) {
     client.from("driver_unavailability").insert(unavailabilityData)
   );
 }
+
 // Timecards CRUD operations
 async function createTimecard(timecardData, userToken) {
   const client = getSupabaseClient(userToken);
@@ -299,7 +301,8 @@ async function deleteTimecard(timecardId, userToken) {
     client.from("timecards").delete().eq("timecard_id", timecardId)
   );
 }
-//initial api call made to load admin dashboard on driver table
+
+// initial api call made to load admin dashboard on driver table
 async function getDriverForAdminDash(userToken) {
   const client = getSupabaseClient(userToken);
   return handle(
@@ -311,7 +314,8 @@ async function getDriverForAdminDash(userToken) {
       .contains("role", ["Driver"])
   );
 }
-//initial api call made to load admin dashboard on volunteer table
+
+// initial api call made to load admin dashboard on volunteer table
 async function getVolunteerForAdminDash(userToken) {
   const client = getSupabaseClient(userToken);
   return handle(
@@ -323,7 +327,8 @@ async function getVolunteerForAdminDash(userToken) {
       .contains("role", ["Volunteer"])
   );
 }
-//initial api call made to load admin dashboard on client table
+
+// initial api call made to load admin dashboard on client table
 async function getClientForAdminDash(userToken) {
   const client = getSupabaseClient(userToken);
   return handle(
@@ -334,7 +339,8 @@ async function getClientForAdminDash(userToken) {
       )
   );
 }
-//initial api call made to load admin dashboard on volunteer table
+
+// initial api call made to load admin dashboard on dispatcher table
 async function getDispatcherForAdminDash(userToken) {
   const client = getSupabaseClient(userToken);
   return handle(
@@ -346,10 +352,12 @@ async function getDispatcherForAdminDash(userToken) {
       .contains("role", ["Dispatcher"])
   );
 }
-//audit log that perform inner join with staff profiles
+
+// audit log that performs inner join with staff profiles
 async function getAuditLogTable(userToken) {
   try {
-    const { data, error } = await supabase.from("transactions_audit_log")
+    const { data, error } = await supabase
+      .from("transactions_audit_log")
       .select(`
         transaction_id,
         action_enum,
@@ -371,7 +379,7 @@ async function getAuditLogTable(userToken) {
   }
 }
 
-//formatter for frontend to receive json
+// formatter for frontend to receive json
 function formatAuditLogData(data) {
   if (Array.isArray(data)) {
     return data.map((item) => ({
@@ -405,8 +413,13 @@ function formatAuditLogData(data) {
 async function getCallTableForLog(userToken) {
   const client = getSupabaseClient(userToken);
   const data = await handle(
-    client.from("calls").select(`
+    client
+      .from("calls")
+      .select(
+        `
         call_id,
+        org_id,
+        user_id,
         call_time,
         call_type,
         other_type,
@@ -416,16 +429,20 @@ async function getCallTableForLog(userToken) {
         client_id,
         caller_first_name,
         caller_last_name,
+        notes,
         staff_profile:user_id (
           first_name,
           last_name
         )
-      `)
+      `
+      )
   );
 
   if (data) {
     return data.map((call) => ({
       call_id: call.call_id,
+      org_id: call.org_id,
+      user_id: call.user_id,
       call_time: call.call_time,
       call_type: call.call_type,
       other_type: call.other_type,
@@ -433,9 +450,15 @@ async function getCallTableForLog(userToken) {
       forwarded_to_name: call.forwarded_to_name,
       forwarded_to_date: call.forwarded_to_date,
       client_id: call.client_id,
+      caller_first_name: call.caller_first_name,
+      caller_last_name: call.caller_last_name,
+      notes: call.notes,
       staff_name: call.staff_profile
-        ? `${call.staff_profile.first_name} ${call.staff_profile.last_name}`.trim()
+        ? `${call.staff_profile.first_name} ${
+            call.staff_profile.last_name
+          }`.trim()
         : null,
+      // keep full caller_name for backwards compatibility / display if needed
       caller_name:
         call.caller_first_name || call.caller_last_name
           ? `${call.caller_first_name || ""} ${
