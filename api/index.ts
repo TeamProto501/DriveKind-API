@@ -615,30 +615,12 @@ app.post("/rides/:ride_id/assign", validateJWT, async (req, res) => {
 // Calls routes
 app.post("/calls", validateJWTWithOrg, async (req, res) => {
   try {
-    const {
-      caller_name,
-      phone_number,
-      call_type,
-      call_time,
-      staff_name,
-      forwarded_to_name,
-      notes,
-    } = req.body || {};
-
     const callData = {
-      caller_name: caller_name || null,
-      phone_number: phone_number || null,
-      call_type: call_type || null,
-      call_time: call_time || null,
-      staff_name: staff_name || null,
-      forwarded_to_name: forwarded_to_name || null,
-      notes: notes || null,
+      ...req.body,
       org_id: req.user.org_id,
       user_id: req.user.id,
     };
-
-    console.log("Creating call with data:", callData);
-
+    /* const call = await db.createCall(callData, req.userToken); */
     const call = await AuditLogger.auditCreate({
       tableName: "calls",
       data: callData,
@@ -646,23 +628,12 @@ app.post("/calls", validateJWTWithOrg, async (req, res) => {
       userToken: req.userToken,
       idField: "call_id",
     });
-
     res.status(201).json(call);
   } catch (error) {
-    const err = error as any; // <-- key line
-
-    console.error("Error creating call:", err);
-
-    const message =
-      err?.message ??
-      err?.details ??
-      err?.hint ??
-      "Failed to create call";
-
-    res.status(500).json({ error: message });
+    console.error("Error creating call:", error);
+    res.status(500).json({ error: "Failed to create call" });
   }
 });
-
 
 app.get("/calls", validateJWT, async (req, res) => {
   try {
