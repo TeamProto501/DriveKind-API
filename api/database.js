@@ -412,14 +412,14 @@ function formatAuditLogData(data) {
 
 async function getCallTableForLog(userToken) {
   const client = getSupabaseClient(userToken);
-  const data = await handle(
+
+  // 1) Get raw calls (no joins so this cannot fail due to relationships)
+  const calls = await handle(
     client
       .from("calls")
       .select(
         `
         call_id,
-        org_id,
-        user_id,
         call_time,
         call_type,
         other_type,
@@ -429,46 +429,65 @@ async function getCallTableForLog(userToken) {
         client_id,
         caller_first_name,
         caller_last_name,
-        notes,
-        staff_profile:user_id (
-          first_name,
-          last_name
-        )
+        user_id,
+        org_id
       `
       )
   );
 
-  if (data) {
-    return data.map((call) => ({
-      call_id: call.call_id,
-      org_id: call.org_id,
-      user_id: call.user_id,
-      call_time: call.call_time,
-      call_type: call.call_type,
-      other_type: call.other_type,
-      phone_number: call.phone_number,
-      forwarded_to_name: call.forwarded_to_name,
-      forwarded_to_date: call.forwarded_to_date,
-      client_id: call.client_id,
-      caller_first_name: call.caller_first_name,
-      caller_last_name: call.caller_last_name,
-      notes: call.notes,
-      staff_name: call.staff_profile
-        ? `${call.staff_profile.first_name} ${
-            call.staff_profile.last_name
-          }`.trim()
-        : null,
-      // keep full caller_name for backwards compatibility / display if needed
-      caller_name:
-        call.caller_first_name || call.caller_last_name
-          ? `${call.caller_first_name || ""} ${
-              call.caller_last_name || ""
-            }`.trim()
-          : null,
-    }));
+  if (!calls || calls.length === 0) {
+    return [];
   }
 
-  return data;
+  // 2) Fetch staff names in a separate query
+  const userIds = [
+    ...new Set(
+      calls
+        .map((c) => c.user_id)
+        .filter((id) => id != null)
+    ),
+  ];
+
+  let staffByUserId = {};
+
+  if (userIds.length > 0) {
+    const staff = await handle(
+      client
+        .from("staff_profiles")
+        .select("user_id, first_name, last_name")
+        .in("user_id", userIds)
+    );
+
+    if (Array.isArray(staff)) {
+      staffByUserId = Object.fromEntries(
+        staff.map((s) => [
+          s.user_id,
+          `${s.first_name || ""} ${s.last_name || ""}`.trim(),
+        ])
+      );
+    }
+  }
+
+  // 3) Shape data for the frontend table
+  return calls.map((call) => ({
+    call_id: call.call_id,
+    call_time: call.call_time,
+    call_type: call.call_type,
+    other_type: call.other_type,
+    phone_number: call.phone_number,
+    forwarded_to_name: call.forwarded_to_name,
+    forwarded_to_date: call.forwarded_to_date,
+    client_id: call.client_id,
+    org_id: call.org_id,
+    user_id: call.user_id,
+    staff_name: staffByUserId[call.user_id] || null,
+    caller_name:
+      call.caller_first_name || call.caller_last_name
+        ? `${call.caller_first_name || ""} ${
+            call.caller_last_name || ""
+          }`.trim()
+        : null,
+  }));
 }
 
 async function deleteLogsByTimeRange(userToken, startTime, endTime) {
