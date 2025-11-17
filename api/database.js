@@ -405,12 +405,15 @@ function formatAuditLogData(data) {
 async function getCallTableForLog(userToken) {
   const client = getSupabaseClient(userToken);
   const data = await handle(
-    client.from("calls").select(`
+    client
+      .from("calls")
+      .select(`
+        call_id,
         call_time,
         call_type,
         other_type,
         phone_number,
-        forwarded_to_name,
+        forwarded_to,
         caller_first_name,
         caller_last_name,
         staff_profile:user_id (
@@ -419,15 +422,20 @@ async function getCallTableForLog(userToken) {
         )
       `)
   );
+
   if (data) {
     return data.map((call) => ({
+      call_id: call.call_id,
       call_time: call.call_time,
       call_type: call.call_type,
       other_type: call.other_type,
       phone_number: call.phone_number,
-      forwarded_to_name: call.forwarded_to_name,
+      // this is what you display as "Forwarded To" in the UI
+      forwarded_to_name: call.forwarded_to,
       staff_name: call.staff_profile
-        ? `${call.staff_profile.first_name} ${call.staff_profile.last_name}`.trim()
+        ? `${call.staff_profile.first_name} ${
+            call.staff_profile.last_name
+          }`.trim()
         : null,
       caller_name:
         call.caller_first_name || call.caller_last_name
