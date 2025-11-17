@@ -514,7 +514,6 @@ module.exports = {
   deleteDriverUnavailability,
   getDispatcherForAdminDash,
   getAuditLogTable,
-  formatAuditLogData,
   getCallTableForLog,
   deleteLogsByTimeRange,
   previewLogsByTimeRange,
