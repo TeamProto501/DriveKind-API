@@ -348,32 +348,21 @@ async function getDispatcherForAdminDash(userToken) {
 }
 //audit log that perform inner join with staff profiles
 async function getAuditLogTable(userToken) {
-  try {
-    const { data, error } = await supabase.from("transactions_audit_log")
-      .select(`
-        transaction_id,
-        action_enum,
-        table_name_enum,
-        timestamp,
-        field_name,
-        old_value,
-        new_value,
-        staff_profiles(first_name, last_name)
-      `);
+  const client = getSupabaseClient(userToken);
+  const data = await handle(
+    client.from("transactions_audit_log").select(`
+      transaction_id,
+      action_enum,
+      table_name_enum,
+      timestamp,
+      field_name,
+      old_value,
+      new_value,
+      staff_profiles(first_name, last_name)
+    `)
+  );
 
-    if (error) {
-      return [error, null];
-    }
-
-    return [null, { data }];
-  } catch (err) {
-    return [err, null];
-  }
-}
-
-//formatter for frontend to receive json
-function formatAuditLogData(data) {
-  if (Array.isArray(data)) {
+  if (data) {
     return data.map((item) => ({
       transaction_id: item.transaction_id,
       action: item.action_enum,
@@ -382,24 +371,13 @@ function formatAuditLogData(data) {
       field_name: item.field_name,
       old_value: item.old_value,
       new_value: item.new_value,
-      name: `${item.staff_profiles?.first_name || ""} ${
-        item.staff_profiles?.last_name || ""
-      }`.trim(),
+      staff_name: item.staff_profiles
+        ? `${item.staff_profiles.first_name} ${item.staff_profiles.last_name}`.trim()
+        : null,
     }));
-  } else {
-    return {
-      transaction_id: data.transaction_id,
-      action: data.action_enum,
-      table_name: data.table_name_enum,
-      timestamp: data.timestamp,
-      field_name: data.field_name,
-      old_value: data.old_value,
-      new_value: data.new_value,
-      name: `${data.staff_profiles?.first_name || ""} ${
-        data.staff_profiles?.last_name || ""
-      }`.trim(),
-    };
   }
+
+  return data;
 }
 
 async function getCallTableForLog(userToken) {
