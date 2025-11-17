@@ -660,8 +660,7 @@ app.get("/calls/:id", validateJWT, async (req, res) => {
 
 app.put("/calls/:id", validateJWT, async (req, res) => {
   try {
-    console.log("PUT /calls/:id", req.params.id, req.body); // <--- add this
-
+    /*  const call = await db.updateCall(req.params.id, req.body, req.userToken); */
     const call = await AuditLogger.auditUpdate({
       tableName: "calls",
       id: req.params.id,
