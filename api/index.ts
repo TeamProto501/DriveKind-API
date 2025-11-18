@@ -1082,7 +1082,7 @@ app.get("/audit-log/dash", validateJWT, async (req, res) => {
     });
   }
 });
-app.get("/log/calls", validateJWT, async (req, res) => {
+app.get("/calls", validateJWT, async (req, res) => {
   try {
     const clients = await db.getCallTableForLog(req.userToken);
     res.json(clients);
@@ -1091,7 +1091,7 @@ app.get("/log/calls", validateJWT, async (req, res) => {
     res.status(500).json({ error: "Failed to fetch data" });
   }
 });
-app.post("/log/deleteByTime", validateJWT, async (req, res) => {
+app.post("/calls/deleteByTime", validateJWT, async (req, res) => {
   try {
     const { startTime, endTime } = req.body;
     if (!startTime || !endTime) {
@@ -1137,7 +1137,7 @@ app.post("/log/deleteByTime", validateJWT, async (req, res) => {
   }
 });
 
-app.post("/log/previewByTime", validateJWT, async (req, res) => {
+app.post("/calls/previewByTime", validateJWT, async (req, res) => {
   try {
     const { startTime, endTime } = req.body;
     if (!startTime || !endTime) {
