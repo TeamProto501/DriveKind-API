@@ -1082,15 +1082,16 @@ app.get("/audit-log/dash", validateJWT, async (req, res) => {
     });
   }
 });
-app.get("/calls", validateJWT, async (req, res) => {
+app.get("/calls/table", validateJWT, async (req, res) => {
   try {
-    const clients = await db.getCallTableForLog(req.userToken);
-    res.json(clients);
+    const calls = await db.getCallTableForLog(req.userToken);
+    res.json(calls);
   } catch (error) {
-    console.error("Error Fetching dispatchers:", error);
-    res.status(500).json({ error: "Failed to fetch data" });
+    console.error("Error fetching calls table:", error);
+    res.status(500).json({ error: "Failed to fetch calls table" });
   }
 });
+
 app.post("/calls/deleteByTime", validateJWT, async (req, res) => {
   try {
     const { startTime, endTime } = req.body;
