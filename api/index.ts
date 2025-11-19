@@ -1375,7 +1375,8 @@ const matchDriversHandler = async (req, res) => {
       profile.org_id
     );
 
-    // Get all drivers in the organization
+    // Get all ACTIVE drivers in the organization
+    // FIX #1: Added .eq("status", "Active") to filter out inactive drivers
     const { data: drivers, error: driversError } = await supabaseAdmin
       .from("staff_profiles")
       .select(
@@ -1389,18 +1390,20 @@ const matchDriversHandler = async (req, res) => {
         can_accept_service_animals,
         town_preference,
         destination_limitation,
-        cannot_handle_mobility_devices
+        cannot_handle_mobility_devices,
+        status
       `
       )
       .eq("org_id", profile.org_id)
-      .contains("role", ["Driver"]);
+      .contains("role", ["Driver"])
+      .eq("status", "Active"); // ADDED: Only get active drivers
 
     if (driversError) {
       console.error("Error fetching drivers:", driversError);
       return res.status(500).json({ error: "Failed to fetch drivers" });
     }
 
-    console.log(`Found ${drivers?.length || 0} drivers in organization`);
+    console.log(`Found ${drivers?.length || 0} active drivers in organization`);
 
     // Get ALL vehicles for these drivers
     const { data: allVehicles, error: vehiclesError } = await supabaseAdmin
@@ -1438,11 +1441,30 @@ const matchDriversHandler = async (req, res) => {
     ][rideDate.getDay()];
 
     // Calculate ride end time (default 1 hour unless estimated_appointment_length specified)
-    const rideDurationMinutes = ride.estimated_appointment_length || 60;
+    // FIX #2: Better parsing of estimated_appointment_length
+    let rideDurationMinutes = 60; // default
+    if (ride.estimated_appointment_length) {
+      // Parse "X hrs Y mins" format
+      const lengthStr = ride.estimated_appointment_length.toLowerCase();
+      const hoursMatch = lengthStr.match(/(\d+)\s*(?:hr|hrs|hour|hours)/);
+      const minsMatch = lengthStr.match(/(\d+)\s*(?:min|mins|minute|minutes)/);
+      
+      let totalMinutes = 0;
+      if (hoursMatch) totalMinutes += parseInt(hoursMatch[1]) * 60;
+      if (minsMatch) totalMinutes += parseInt(minsMatch[1]);
+      
+      if (totalMinutes > 0) {
+        rideDurationMinutes = totalMinutes;
+      }
+    }
+    
     const rideEndTime = new Date(
       rideDate.getTime() + rideDurationMinutes * 60000
     );
 
+    // FIX #3: Get unavailability with proper date formatting
+    const rideDateStr = rideDate.toISOString().split("T")[0];
+    
     const { data: unavailability, error: unavailError } = await supabaseAdmin
       .from("driver_unavailability")
       .select("*")
@@ -1451,9 +1473,7 @@ const matchDriversHandler = async (req, res) => {
         drivers.map((d) => d.user_id)
       )
       .or(
-        `unavailable_date.eq.${
-          rideDate.toISOString().split("T")[0]
-        },repeating_day.eq.${rideDayOfWeek}`
+        `unavailable_date.eq.${rideDateStr},repeating_day.eq.${rideDayOfWeek}`
       );
 
     if (unavailError) {
@@ -1509,6 +1529,8 @@ const matchDriversHandler = async (req, res) => {
       rideEndMinute
     ).padStart(2, "0")}:00`;
 
+    console.log(`Ride time window: ${rideStartTimeString} - ${rideEndTimeString} on ${rideDayOfWeek}`);
+
     const matchedDrivers = drivers.map((driver) => {
       const result = {
         user_id: driver.user_id,
@@ -1524,23 +1546,53 @@ const matchDriversHandler = async (req, res) => {
       // ==================== HARD FILTERS ====================
 
       // 1. Check unavailability (intersecting or touching the ride time window)
+      // FIX #4: Improved unavailability checking logic
       const driverUnavail =
         unavailability?.filter((u) => u.user_id === driver.user_id) || [];
-      const isUnavailable = driverUnavail.some((u) => {
-        if (u.all_day) return true;
-        if (u.start_time && u.end_time) {
-          // Check if unavailability intersects or touches ride window
-          return !(
-            u.end_time < rideStartTimeString || u.start_time > rideEndTimeString
-          );
+      
+      let isUnavailable = false;
+      let unavailReason = "";
+      
+      for (const u of driverUnavail) {
+        // Check if this unavailability applies to this ride
+        const isDateMatch = u.unavailable_date === rideDateStr;
+        const isRecurringMatch = u.repeating_day === rideDayOfWeek;
+        
+        if (!isDateMatch && !isRecurringMatch) {
+          continue; // This unavailability doesn't apply
         }
-        return false;
-      });
+        
+        // If all_day, driver is unavailable
+        if (u.all_day) {
+          isUnavailable = true;
+          unavailReason = isRecurringMatch 
+            ? `Recurring unavailability on ${rideDayOfWeek}s (all day)`
+            : `Unavailable on ${rideDateStr} (all day)`;
+          break;
+        }
+        
+        // Check time overlap
+        if (u.start_time && u.end_time) {
+          // Convert times to comparable format (HH:MM:SS)
+          const unavailStart = u.start_time;
+          const unavailEnd = u.end_time;
+          
+          // Check if ride window overlaps with unavailability window
+          // Overlap exists if: rideStart < unavailEnd AND rideEnd > unavailStart
+          const hasOverlap = rideStartTimeString < unavailEnd && rideEndTimeString > unavailStart;
+          
+          if (hasOverlap) {
+            isUnavailable = true;
+            unavailReason = isRecurringMatch
+              ? `Recurring unavailability on ${rideDayOfWeek}s (${u.start_time} - ${u.end_time})`
+              : `Unavailable on ${rideDateStr} (${u.start_time} - ${u.end_time})`;
+            break;
+          }
+        }
+      }
 
       if (isUnavailable) {
-        result.exclusion_reasons.push(
-          "Driver unavailable during ride time window"
-        );
+        result.exclusion_reasons.push(unavailReason || "Driver unavailable during ride time window");
         result.match_quality = "excluded";
         return result;
       }
