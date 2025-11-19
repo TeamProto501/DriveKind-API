@@ -177,66 +177,59 @@ app.post("/admin/create-auth-user", validateJWT, async (req, res) => {
 
     // Verify admin role
     const { data: adminProfile, error: adminProfileError } = await supabaseAdmin
-      .from("staff_profiles")
-      .select("user_id, org_id, role")
-      .eq("user_id", req.user.id)
+      .from('staff_profiles')
+      .select('user_id, org_id, role')
+      .eq('user_id', req.user.id)
       .single();
 
     if (adminProfileError || !adminProfile) {
-      return res.status(404).json({ error: "Admin profile not found" });
+      return res.status(404).json({ error: 'Admin profile not found' });
     }
 
-    const hasAdminRole =
-      adminProfile.role &&
-      (Array.isArray(adminProfile.role)
-        ? adminProfile.role.includes("Admin") ||
-          adminProfile.role.includes("Super Admin")
-        : adminProfile.role === "Admin" || adminProfile.role === "Super Admin");
+    const hasAdminRole = adminProfile.role && (
+      Array.isArray(adminProfile.role) 
+        ? (adminProfile.role.includes('Admin') || adminProfile.role.includes('Super Admin'))
+        : (adminProfile.role === 'Admin' || adminProfile.role === 'Super Admin')
+    );
 
     if (!hasAdminRole) {
-      return res.status(403).json({ error: "Admin access required" });
+      return res.status(403).json({ error: 'Admin access required' });
     }
 
     // Check if email already exists BEFORE trying to create
     const { data: existingUser } = await supabaseAdmin.auth.admin.listUsers();
-    const emailExists = existingUser?.users?.some(
-      (u) => u.email?.toLowerCase() === email.toLowerCase()
-    );
-
+    const emailExists = existingUser?.users?.some(u => u.email?.toLowerCase() === email.toLowerCase());
+    
     if (emailExists) {
-      return res.status(400).json({
-        error: `Email address ${email} is already registered. Please use a different email or contact support if you believe this is an error.`,
+      return res.status(400).json({ 
+        error: `Email address ${email} is already registered. Please use a different email or contact support if you believe this is an error.` 
       });
     }
 
     // Create auth user with service role key
-    const { data: authData, error: authError } =
-      await supabaseAdmin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: {
-          first_name,
-          last_name,
-        },
-      });
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        first_name,
+        last_name,
+      },
+    });
 
     if (authError || !authData.user) {
       console.error("Auth creation error:", authError);
-
+      
       // Better error messages for common issues
-      let errorMsg = authError?.message || "Failed to create auth user";
-      if (
-        errorMsg.toLowerCase().includes("already registered") ||
-        errorMsg.toLowerCase().includes("already exists")
-      ) {
+      let errorMsg = authError?.message || 'Failed to create auth user';
+      if (errorMsg.toLowerCase().includes('already registered') || errorMsg.toLowerCase().includes('already exists')) {
         errorMsg = `Email address ${email} is already registered. Please use a different email.`;
-      } else if (errorMsg.toLowerCase().includes("invalid email")) {
+      } else if (errorMsg.toLowerCase().includes('invalid email')) {
         errorMsg = `Invalid email format: ${email}`;
-      } else if (errorMsg.toLowerCase().includes("password")) {
+      } else if (errorMsg.toLowerCase().includes('password')) {
         errorMsg = `Password does not meet requirements: ${errorMsg}`;
       }
-
+      
       return res.status(400).json({ error: errorMsg });
     }
 
@@ -245,86 +238,79 @@ app.post("/admin/create-auth-user", validateJWT, async (req, res) => {
     // Create staff profile if profileData provided
     if (profileData) {
       console.log("Creating staff profile for:", authData.user.id);
-
+      
       const staffProfile = {
         user_id: authData.user.id,
         org_id: adminProfile.org_id,
         first_name,
         last_name,
         email,
-        dob: profileData.dob || new Date().toISOString().split("T")[0],
-        address: profileData.address || "",
+        dob: profileData.dob || new Date().toISOString().split('T')[0],
+        address: profileData.address || '',
         zipcode: parseFloat(profileData.zipcode) || 0,
-        city: profileData.city || "",
-        state: profileData.state || "NY",
-        user_name: email.split("@")[0],
-        primary_phone: profileData.primary_phone || "",
+        city: profileData.city || '',
+        state: profileData.state || 'NY',
+        user_name: email.split('@')[0],
+        primary_phone: profileData.primary_phone || '',
         secondary_phone: profileData.secondary_phone || null,
         primary_is_cell: profileData.primary_is_cell ?? true,
         primary_can_text: profileData.primary_can_text ?? true,
         secondary_is_cell: profileData.secondary_is_cell ?? false,
         secondary_can_text: profileData.secondary_can_text ?? false,
-        role: profileData.role || ["Driver"],
+        role: profileData.role || ['Driver'],
         address2: profileData.address2 || null,
         town_preference: profileData.town_preference || null,
-        contact_pref_enum: profileData.contact_pref_enum || "Phone",
-        start_date: new Date().toISOString().split("T")[0],
+        contact_pref_enum: profileData.contact_pref_enum || 'Phone',
+        start_date: new Date().toISOString().split('T')[0],
         mileage_reimbursement: profileData.mileage_reimbursement ?? false,
         training_completed: profileData.training_completed ?? true,
         max_weekly_rides: profileData.max_weekly_rides || null,
-        can_accept_service_animals:
-          profileData.can_accept_service_animals ?? true,
+        can_accept_service_animals: profileData.can_accept_service_animals ?? true,
         emergency_contact: profileData.emergency_contact || null,
         emergency_reln: profileData.emergency_reln || null,
         emergency_phone: profileData.emergency_phone || null,
         destination_limitation: profileData.destination_limitation || null,
         allergens: profileData.allergens || null,
         driver_other_limitations: profileData.driver_other_limitations || null,
-        gender: profileData.gender || "Other", // ← Add this
+        gender: profileData.gender || 'Other' // ← Add this
       };
 
       const { data: newProfile, error: insertError } = await supabaseAdmin
-        .from("staff_profiles")
+        .from('staff_profiles')
         .insert([staffProfile])
         .select()
         .single();
 
       if (insertError) {
-        console.error("Profile insert error:", insertError);
-        console.log("Rolling back - deleting auth user:", authData.user.id);
+        console.error('Profile insert error:', insertError);
+        console.log('Rolling back - deleting auth user:', authData.user.id);
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-
+        
         let errorMsg = insertError.message;
-        if (
-          errorMsg.includes("duplicate key") ||
-          errorMsg.includes("unique constraint")
-        ) {
-          errorMsg = "A profile with this information already exists.";
+        if (errorMsg.includes('duplicate key') || errorMsg.includes('unique constraint')) {
+          errorMsg = 'A profile with this information already exists.';
         }
-
-        return res
-          .status(500)
-          .json({ error: `Failed to create profile: ${errorMsg}` });
+        
+        return res.status(500).json({ error: `Failed to create profile: ${errorMsg}` });
       }
 
-      console.log("Staff profile created successfully");
-
-      res.json({
+      console.log('Staff profile created successfully');
+      
+      res.json({ 
         success: true,
-        user_id: authData.user.id,
-        profile: newProfile,
+        user_id: authData.user.id, 
+        profile: newProfile 
       });
     } else {
-      res.json({
+      res.json({ 
         success: true,
-        user_id: authData.user.id,
+        user_id: authData.user.id 
       });
     }
+
   } catch (error) {
     console.error("Error creating auth user:", error);
-    res
-      .status(500)
-      .json({ error: `Failed to create auth user: ${error.message}` });
+    res.status(500).json({ error: `Failed to create auth user: ${error.message}` });
   }
 });
 
@@ -1060,19 +1046,19 @@ app.get("/dispatcher/dash", validateJWT, async (req, res) => {
 
 app.get("/audit-log/dash", validateJWT, async (req, res) => {
   try {
-    const data = await db.getAuditLogTable(req.userToken);
-
-    if (!data) {
+    const [error, result] = await db.getAuditLogTable(req.userToken);
+    if (error) {
+      console.error("Database query error:", error);
       return res.status(500).json({
         success: false,
         error: "Error fetching data.",
       });
     }
-
+    const formattedData = db.formatAuditLogData(result.data);
     res.json({
       success: true,
-      data: data,
-      count: data.length,
+      data: formattedData,
+      count: formattedData.length,
     });
   } catch (err) {
     console.error("Server error:", err);
@@ -1374,7 +1360,8 @@ const matchDriversHandler = async (req, res) => {
       profile.org_id
     );
 
-    // Get all drivers in the organization
+    // Get all ACTIVE drivers in the organization
+    // FIX #1: Added .eq("active", true) to filter out inactive drivers
     const { data: drivers, error: driversError } = await supabaseAdmin
       .from("staff_profiles")
       .select(
@@ -1388,18 +1375,20 @@ const matchDriversHandler = async (req, res) => {
         can_accept_service_animals,
         town_preference,
         destination_limitation,
-        cannot_handle_mobility_devices
+        cannot_handle_mobility_devices,
+        active
       `
       )
       .eq("org_id", profile.org_id)
-      .contains("role", ["Driver"]);
+      .contains("role", ["Driver"])
+      .eq("active", true); // ADDED: Only get active drivers
 
     if (driversError) {
       console.error("Error fetching drivers:", driversError);
       return res.status(500).json({ error: "Failed to fetch drivers" });
     }
 
-    console.log(`Found ${drivers?.length || 0} drivers in organization`);
+    console.log(`Found ${drivers?.length || 0} active drivers in organization`);
 
     // Get ALL vehicles for these drivers
     const { data: allVehicles, error: vehiclesError } = await supabaseAdmin
@@ -1437,11 +1426,30 @@ const matchDriversHandler = async (req, res) => {
     ][rideDate.getDay()];
 
     // Calculate ride end time (default 1 hour unless estimated_appointment_length specified)
-    const rideDurationMinutes = ride.estimated_appointment_length || 60;
+    // FIX #2: Better parsing of estimated_appointment_length
+    let rideDurationMinutes = 60; // default
+    if (ride.estimated_appointment_length) {
+      // Parse "X hrs Y mins" format
+      const lengthStr = ride.estimated_appointment_length.toLowerCase();
+      const hoursMatch = lengthStr.match(/(\d+)\s*(?:hr|hrs|hour|hours)/);
+      const minsMatch = lengthStr.match(/(\d+)\s*(?:min|mins|minute|minutes)/);
+      
+      let totalMinutes = 0;
+      if (hoursMatch) totalMinutes += parseInt(hoursMatch[1]) * 60;
+      if (minsMatch) totalMinutes += parseInt(minsMatch[1]);
+      
+      if (totalMinutes > 0) {
+        rideDurationMinutes = totalMinutes;
+      }
+    }
+    
     const rideEndTime = new Date(
       rideDate.getTime() + rideDurationMinutes * 60000
     );
 
+    // FIX #3: Get unavailability with proper date formatting
+    const rideDateStr = rideDate.toISOString().split("T")[0];
+    
     const { data: unavailability, error: unavailError } = await supabaseAdmin
       .from("driver_unavailability")
       .select("*")
@@ -1450,9 +1458,7 @@ const matchDriversHandler = async (req, res) => {
         drivers.map((d) => d.user_id)
       )
       .or(
-        `unavailable_date.eq.${
-          rideDate.toISOString().split("T")[0]
-        },repeating_day.eq.${rideDayOfWeek}`
+        `unavailable_date.eq.${rideDateStr},repeating_day.eq.${rideDayOfWeek}`
       );
 
     if (unavailError) {
@@ -1508,6 +1514,8 @@ const matchDriversHandler = async (req, res) => {
       rideEndMinute
     ).padStart(2, "0")}:00`;
 
+    console.log(`Ride time window: ${rideStartTimeString} - ${rideEndTimeString} on ${rideDayOfWeek}`);
+
     const matchedDrivers = drivers.map((driver) => {
       const result = {
         user_id: driver.user_id,
@@ -1523,23 +1531,53 @@ const matchDriversHandler = async (req, res) => {
       // ==================== HARD FILTERS ====================
 
       // 1. Check unavailability (intersecting or touching the ride time window)
+      // FIX #4: Improved unavailability checking logic
       const driverUnavail =
         unavailability?.filter((u) => u.user_id === driver.user_id) || [];
-      const isUnavailable = driverUnavail.some((u) => {
-        if (u.all_day) return true;
-        if (u.start_time && u.end_time) {
-          // Check if unavailability intersects or touches ride window
-          return !(
-            u.end_time < rideStartTimeString || u.start_time > rideEndTimeString
-          );
+      
+      let isUnavailable = false;
+      let unavailReason = "";
+      
+      for (const u of driverUnavail) {
+        // Check if this unavailability applies to this ride
+        const isDateMatch = u.unavailable_date === rideDateStr;
+        const isRecurringMatch = u.repeating_day === rideDayOfWeek;
+        
+        if (!isDateMatch && !isRecurringMatch) {
+          continue; // This unavailability doesn't apply
         }
-        return false;
-      });
+        
+        // If all_day, driver is unavailable
+        if (u.all_day) {
+          isUnavailable = true;
+          unavailReason = isRecurringMatch 
+            ? `Recurring unavailability on ${rideDayOfWeek}s (all day)`
+            : `Unavailable on ${rideDateStr} (all day)`;
+          break;
+        }
+        
+        // Check time overlap
+        if (u.start_time && u.end_time) {
+          // Convert times to comparable format (HH:MM:SS)
+          const unavailStart = u.start_time;
+          const unavailEnd = u.end_time;
+          
+          // Check if ride window overlaps with unavailability window
+          // Overlap exists if: rideStart < unavailEnd AND rideEnd > unavailStart
+          const hasOverlap = rideStartTimeString < unavailEnd && rideEndTimeString > unavailStart;
+          
+          if (hasOverlap) {
+            isUnavailable = true;
+            unavailReason = isRecurringMatch
+              ? `Recurring unavailability on ${rideDayOfWeek}s (${u.start_time} - ${u.end_time})`
+              : `Unavailable on ${rideDateStr} (${u.start_time} - ${u.end_time})`;
+            break;
+          }
+        }
+      }
 
       if (isUnavailable) {
-        result.exclusion_reasons.push(
-          "Driver unavailable during ride time window"
-        );
+        result.exclusion_reasons.push(unavailReason || "Driver unavailable during ride time window");
         result.match_quality = "excluded";
         return result;
       }
@@ -1745,11 +1783,7 @@ const matchDriversHandler = async (req, res) => {
 };
 
 app.post("/rides/:rideId/match-drivers", validateJWT, matchDriversHandler);
-app.post(
-  "/dispatcher/:orgId/rides/:rideId/match-drivers",
-  validateJWT,
-  matchDriversHandler
-);
+app.post("/dispatcher/:orgId/rides/:rideId/match-drivers", validateJWT, matchDriversHandler);
 
 // GET /rides/:rideId/requests  -> list {driver_id, denied} for a ride (scoped to dispatcher's org)
 app.get("/rides/:rideId/requests", validateJWT, async (req, res) => {
@@ -1798,7 +1832,7 @@ app.get("/rides/:rideId/requests", validateJWT, async (req, res) => {
     if (error) return res.status(500).json({ error: error.message });
 
     res.json({ success: true, requests: data ?? [] });
-  } catch (e: any) {
+  } catch (e:any) {
     console.error(e);
     res.status(500).json({ error: e.message || "Unexpected error" });
   }
@@ -1851,9 +1885,7 @@ app.post("/rides/:rideId/send-request", validateJWT, async (req, res) => {
     if (ride.status !== "Requested") {
       return res
         .status(400)
-        .json({
-          error: "Can only send requests for rides in Requested status",
-        });
+        .json({ error: "Can only send requests for rides in Requested status" });
     }
 
     // Driver exists in org and has Driver role
@@ -1880,25 +1912,13 @@ app.post("/rides/:rideId/send-request", validateJWT, async (req, res) => {
     // Only create/refresh the pending request record
     const { error: reqUpsertError } = await supabaseAdmin
       .from("ride_requests")
-      .upsert(
-        [
-          {
-            ride_id: rideId,
-            org_id: profile.org_id,
-            driver_id: driver_user_id,
-            denied: false,
-          },
-        ],
-        {
-          onConflict: "ride_id,driver_id",
-        }
-      );
+      .upsert([{ ride_id: rideId, org_id: profile.org_id, driver_id: driver_user_id, denied: false }], {
+        onConflict: "ride_id,driver_id",
+      });
 
     if (reqUpsertError) {
       console.error("ride_requests upsert error:", reqUpsertError);
-      return res
-        .status(500)
-        .json({ error: "Failed to create ride request row" });
+      return res.status(500).json({ error: "Failed to create ride request row" });
     }
 
     // NOTE: do NOT update rides.status or rides.driver_user_id here
@@ -1922,16 +1942,14 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
       .select("user_id, org_id, role")
       .eq("user_id", driverId)
       .single();
-    if (profileErr || !profile)
-      return res.status(404).json({ error: "Profile not found" });
+    if (profileErr || !profile) return res.status(404).json({ error: "Profile not found" });
 
     const isDriver =
       profile.role &&
       (Array.isArray(profile.role)
         ? profile.role.includes("Driver")
         : profile.role === "Driver");
-    if (!isDriver)
-      return res.status(403).json({ error: "Driver role required" });
+    if (!isDriver) return res.status(403).json({ error: "Driver role required" });
 
     // Ride must be in same org - also get riders count for vehicle validation
     const { data: ride, error: rideError } = await supabaseAdmin
@@ -1940,8 +1958,7 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
       .eq("ride_id", rideId)
       .eq("org_id", profile.org_id)
       .single();
-    if (rideError || !ride)
-      return res.status(404).json({ error: "Ride not found or access denied" });
+    if (rideError || !ride) return res.status(404).json({ error: "Ride not found or access denied" });
 
     // Look up request WITHOUT org filter (older rows may have null org_id)
     const { data: requestRow, error: reqErr } = await supabaseAdmin
@@ -1951,9 +1968,7 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
       .eq("driver_id", driverId)
       .maybeSingle();
     if (reqErr || !requestRow || requestRow.denied === true) {
-      return res
-        .status(400)
-        .json({ error: "No pending request for this driver" });
+      return res.status(400).json({ error: "No pending request for this driver" });
     }
 
     // Backfill org_id on the request if missing
@@ -2013,17 +2028,21 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
       .from("rides")
       .update(updateData)
       .eq("ride_id", rideId);
+<<<<<<< HEAD
     if (updateErr) {
       console.error("Error updating ride:", updateErr);
       return res.status(500).json({ error: "Failed to accept ride" });
     }
+=======
+    if (updateErr) return res.status(500).json({ error: "Failed to accept ride" });
+>>>>>>> 040ad4c86fd08d64bd4bfbadf7b4a4464151deba
 
     // ✅ CANCEL ALL OTHER PENDING REQUESTS FOR THIS RIDE
     const { error: cancelErr } = await supabaseAdmin
       .from("ride_requests")
-      .update({
+      .update({ 
         denied: true,
-        updated_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       })
       .eq("ride_id", rideId)
       .eq("denied", false)
@@ -2055,16 +2074,14 @@ app.post("/rides/:rideId/decline", validateJWT, async (req, res) => {
       .select("user_id, org_id, role")
       .eq("user_id", driverId)
       .single();
-    if (profileErr || !profile)
-      return res.status(404).json({ error: "Profile not found" });
+    if (profileErr || !profile) return res.status(404).json({ error: "Profile not found" });
 
     const isDriver =
       profile.role &&
       (Array.isArray(profile.role)
         ? profile.role.includes("Driver")
         : profile.role === "Driver");
-    if (!isDriver)
-      return res.status(403).json({ error: "Driver role required" });
+    if (!isDriver) return res.status(403).json({ error: "Driver role required" });
 
     // Ride must be in same org
     const { data: ride, error: rideError } = await supabaseAdmin
@@ -2073,8 +2090,7 @@ app.post("/rides/:rideId/decline", validateJWT, async (req, res) => {
       .eq("ride_id", rideId)
       .eq("org_id", profile.org_id)
       .single();
-    if (rideError || !ride)
-      return res.status(404).json({ error: "Ride not found or access denied" });
+    if (rideError || !ride) return res.status(404).json({ error: "Ride not found or access denied" });
 
     // Look up request WITHOUT org filter (older rows may have null org_id)
     const { data: requestRow, error: reqErr } = await supabaseAdmin
@@ -2084,9 +2100,7 @@ app.post("/rides/:rideId/decline", validateJWT, async (req, res) => {
       .eq("driver_id", driverId)
       .maybeSingle();
     if (reqErr || !requestRow || requestRow.denied === true) {
-      return res
-        .status(400)
-        .json({ error: "No ride request found for this driver" });
+      return res.status(400).json({ error: "No ride request found for this driver" });
     }
 
     // Backfill org_id on the request if missing
@@ -2104,8 +2118,7 @@ app.post("/rides/:rideId/decline", validateJWT, async (req, res) => {
       .update({ denied: true })
       .eq("ride_id", rideId)
       .eq("driver_id", driverId);
-    if (reqUpdateErr)
-      return res.status(500).json({ error: "Failed to mark request denied" });
+    if (reqUpdateErr) return res.status(500).json({ error: "Failed to mark request denied" });
 
     // (Optional note append retained, but not required)
     res.json({ success: true });
