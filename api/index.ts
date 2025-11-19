@@ -1914,6 +1914,7 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
   try {
     const rideId = parseInt(req.params.rideId);
     const driverId = req.user.id;
+    const { vehicle_id } = req.body; // NEW: Accept vehicle_id from request body
 
     // Driver profile (role + org)
     const { data: profile, error: profileErr } = await supabaseAdmin
@@ -1932,10 +1933,10 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
     if (!isDriver)
       return res.status(403).json({ error: "Driver role required" });
 
-    // Ride must be in same org
+    // Ride must be in same org - also get riders count for vehicle validation
     const { data: ride, error: rideError } = await supabaseAdmin
       .from("rides")
-      .select("ride_id, org_id, status")
+      .select("ride_id, org_id, status, riders")
       .eq("ride_id", rideId)
       .eq("org_id", profile.org_id)
       .single();
@@ -1964,13 +1965,58 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
         .eq("driver_id", driverId);
     }
 
-    // Assign driver & set ride to Scheduled
+    // NEW: Validate vehicle if provided
+    let assignedVehicleId = null;
+    if (vehicle_id) {
+      // Verify vehicle belongs to driver and is active
+      const { data: vehicle, error: vehicleError } = await supabaseAdmin
+        .from("vehicles")
+        .select("vehicle_id, user_id, active, nondriver_seats")
+        .eq("vehicle_id", vehicle_id)
+        .eq("user_id", driverId)
+        .single();
+
+      if (vehicleError || !vehicle) {
+        return res
+          .status(404)
+          .json({ error: "Vehicle not found or does not belong to driver" });
+      }
+
+      if (!vehicle.active) {
+        return res.status(400).json({ error: "Vehicle must be active" });
+      }
+
+      // Validate vehicle has enough seats (riders + 1 for driver)
+      const requiredSeats = (ride.riders || 0) + 1;
+      const vehicleSeats = (vehicle.nondriver_seats || 0) + 1; // +1 for driver
+      if (vehicleSeats < requiredSeats) {
+        return res.status(400).json({
+          error: `Vehicle does not have enough seats. Required: ${requiredSeats}, Available: ${vehicleSeats}`,
+        });
+      }
+
+      assignedVehicleId = vehicle.vehicle_id;
+    }
+
+    // Assign driver, set ride to Scheduled, and save assigned_vehicle
+    const updateData = {
+      driver_user_id: driverId,
+      status: "Scheduled",
+    };
+    
+    // Only include assigned_vehicle if vehicle_id was provided
+    if (assignedVehicleId) {
+      updateData.assigned_vehicle = assignedVehicleId;
+    }
+
     const { error: updateErr } = await supabaseAdmin
       .from("rides")
-      .update({ driver_user_id: driverId, status: "Scheduled" })
+      .update(updateData)
       .eq("ride_id", rideId);
-    if (updateErr)
+    if (updateErr) {
+      console.error("Error updating ride:", updateErr);
       return res.status(500).json({ error: "Failed to accept ride" });
+    }
 
     // ✅ CANCEL ALL OTHER PENDING REQUESTS FOR THIS RIDE
     const { error: cancelErr } = await supabaseAdmin
@@ -1990,7 +2036,7 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
       console.log(`Cancelled other pending requests for ride ${rideId}`);
     }
 
-    res.json({ success: true });
+    res.json({ success: true, assigned_vehicle: assignedVehicleId });
   } catch (error) {
     console.error("Error in ride acceptance:", error);
     res.status(500).json({ error: `Internal server error: ${error.message}` });
