@@ -615,12 +615,16 @@ app.post("/rides/:ride_id/assign", validateJWT, async (req, res) => {
 // Calls routes
 app.post("/calls", validateJWTWithOrg, async (req, res) => {
   try {
+    // If the frontend sends a dispatcher in req.body.user_id, use it.
+    // Otherwise default to the currently logged-in user.
+    const dispatcherId = req.body.user_id || req.user.id;
+
     const callData = {
       ...req.body,
       org_id: req.user.org_id,
-      user_id: req.user.id,
+      user_id: dispatcherId,
     };
-    /* const call = await db.createCall(callData, req.userToken); */
+
     const call = await AuditLogger.auditCreate({
       tableName: "calls",
       data: callData,
