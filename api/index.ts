@@ -1396,7 +1396,7 @@ const matchDriversHandler = async (req, res) => {
       )
       .eq("org_id", profile.org_id)
       .contains("role", ["Driver"])
-      .eq("status", "Active"); // ADDED: Only get active drivers
+      .eq("active", "Active"); // ADDED: Only get active drivers
 
     if (driversError) {
       console.error("Error fetching drivers:", driversError);
