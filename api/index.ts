@@ -1296,6 +1296,21 @@ app.post("/rides/:rideId/confirm", validateJWT, async (req, res) => {
   }
 });
 
+function getWeekBoundsSundayToSaturday(date) {
+  const d = new Date(date);
+  const day = d.getDay(); // Sunday = 0
+
+  const weekStart = new Date(d);
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - day);
+
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
+
+  return { weekStart, weekEnd };
+}
+
 // Driver matching algorithm endpoint
 const matchDriversHandler = async (req, res) => {
   try {
@@ -1419,6 +1434,7 @@ const matchDriversHandler = async (req, res) => {
 
     // Get unavailability for all drivers
     const rideDate = new Date(ride.appointment_time);
+    const { weekStart, weekEnd } = getWeekBoundsSundayToSaturday(rideDate);
     const rideDayOfWeek = [
       "Sunday",
       "Monday",
@@ -1469,33 +1485,37 @@ const matchDriversHandler = async (req, res) => {
       console.error("Error fetching unavailability:", unavailError);
     }
 
-    // Get recent ride counts for each driver (last 7 days for weekly count)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+   // Get weekly ride counts for each driver (Sunday–Saturday week of this ride)
+  const countedStatuses = [
+    "Scheduled",
+    "Assigned",
+    "In Progress",
+    "Completed",
+    "Reported",
+  ];
 
-    const { data: recentRides, error: recentRidesError } = await supabaseAdmin
-      .from("rides")
-      .select("driver_user_id")
-      .in(
-        "driver_user_id",
-        drivers.map((d) => d.user_id)
-      )
-      .gte("appointment_time", sevenDaysAgo.toISOString())
-      .in("status", [
-        "Scheduled",
-        "Assigned",
-        "In Progress",
-        "Completed",
-        "Pending",
-      ]);
+  const { data: weeklyRides, error: weeklyRidesError } = await supabaseAdmin
+    .from("rides")
+    .select("driver_user_id")
+    .in(
+      "driver_user_id",
+      drivers.map((d) => d.user_id)
+    )
+    .gte("appointment_time", weekStart.toISOString())
+    .lte("appointment_time", weekEnd.toISOString())
+    .in("status", countedStatuses);
 
-    const recentRideCounts = {};
-    if (recentRides) {
-      recentRides.forEach((r) => {
-        recentRideCounts[r.driver_user_id] =
-          (recentRideCounts[r.driver_user_id] || 0) + 1;
-      });
-    }
+  if (weeklyRidesError) {
+    console.error("Error fetching weekly ride counts:", weeklyRidesError);
+  }
+
+  const weeklyRideCounts = {};
+  if (weeklyRides) {
+    weeklyRides.forEach((r) => {
+      weeklyRideCounts[r.driver_user_id] =
+        (weeklyRideCounts[r.driver_user_id] || 0) + 1;
+    });
+  }
 
     // Get pickup and dropoff locations
     const pickupCity = ride.pickup_from_home
@@ -1623,12 +1643,12 @@ const matchDriversHandler = async (req, res) => {
       }
 
       // 4. Check weekly ride limit
-      const recentCount = recentRideCounts[driver.user_id] || 0;
-      const maxWeekly = driver.max_weekly_rides || 999;
+      const ridesThisWeek = weeklyRideCounts[driver.user_id] || 0;
+      const maxWeekly = driver.max_weekly_rides ?? 0; // 0 or null = no limit
 
-      if (recentCount >= maxWeekly) {
+      if (maxWeekly > 0 && ridesThisWeek >= maxWeekly) {
         result.exclusion_reasons.push(
-          `Weekly ride limit reached (${recentCount}/${maxWeekly})`
+          `Driver has reached their weekly ride limit (${maxWeekly} rides).`
         );
         result.match_quality = "excluded";
         return result;
@@ -1713,14 +1733,15 @@ const matchDriversHandler = async (req, res) => {
         result.score += Math.max(0, daysSinceLastDrive * 5);
       }
 
-      // 3. Recent assignment balance
-      if (recentCount === 0) {
+      // 3. Recent assignment balance (within this week)
+      if (ridesThisWeek === 0) {
         result.score += 20;
-        result.reasons.push("No recent assignments this week");
-      } else if (recentCount < maxWeekly / 2) {
+        result.reasons.push("No rides scheduled this week");
+      } else if (ridesThisWeek <= 2) {
         result.score += 10;
+        result.reasons.push(`${ridesThisWeek} ride(s) scheduled this week`);
       } else {
-        result.reasons.push(`${recentCount}/${maxWeekly} rides this week`);
+        result.reasons.push(`${ridesThisWeek} rides scheduled this week`);
       }
 
       // Determine match quality based on score
