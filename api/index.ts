@@ -1606,22 +1606,21 @@ const matchDriversHandler = async (req, res) => {
         return result;
       }
 
-      // 2. Check destination limitation
+      // 2. Check destination limitation (BLOCK LIST: driver cannot go to these towns)
       if (driver.destination_limitation) {
-        const allowedDestinations = driver.destination_limitation
+        const blockedTowns = driver.destination_limitation
           .toLowerCase()
           .split(",")
-          .map((d) => d.trim());
+          .map((t) => t.trim())
+          .filter(Boolean);
 
-        const destinationCity =
-          ride.destination_name?.toLowerCase() || dropoffCity;
+        // Treat dropoff_city as the "town" of the destination
+        const destinationTown = dropoffCity; // already lowercased above
 
-        if (
-          destinationCity &&
-          !allowedDestinations.some((d) => destinationCity.includes(d))
-        ) {
+        // If the ride's destination town is in the driver's block list, exclude them
+        if (destinationTown && blockedTowns.includes(destinationTown)) {
           result.exclusion_reasons.push(
-            `Destination outside allowed areas (${driver.destination_limitation})`
+            `Driver cannot take rides to ${destinationTown} (${driver.destination_limitation})`
           );
           result.match_quality = "excluded";
           return result;
@@ -1685,30 +1684,27 @@ const matchDriversHandler = async (req, res) => {
 
       // ==================== QUALITY FILTERS ====================
 
-      // 1. Town Preference Matching (determines sort group)
+      // 1. Town Preference Matching (pickup town only → priority boost)
       if (driver.town_preference) {
         const preferredTowns = driver.town_preference
           .toLowerCase()
           .split(",")
-          .map((t) => t.trim());
+          .map((t) => t.trim())
+          .filter(Boolean);
 
         const pickupMatch =
-          pickupCity && preferredTowns.some((t) => pickupCity.includes(t));
-        const dropoffMatch =
-          dropoffCity && preferredTowns.some((t) => dropoffCity.includes(t));
+          pickupCity && preferredTowns.includes(pickupCity);
 
-        if (pickupMatch && dropoffMatch) {
-          result.town_preference_category = 1; // Best: both match
+        if (pickupMatch) {
+          // Best bucket if pickup town matches driver's preference
+          result.town_preference_category = 1;
           result.score += 30;
           result.reasons.push(
-            "Matches town preference for both pickup and dropoff"
+            "Pickup town matches driver's town preference"
           );
-        } else if (pickupMatch || dropoffMatch) {
-          result.town_preference_category = 2; // Good: one matches
-          result.score += 15;
-          result.reasons.push("Matches town preference for pickup or dropoff");
         } else {
-          result.town_preference_category = 3; // No match
+          // No pickup match → lower priority bucket
+          result.town_preference_category = 3;
         }
       }
 
