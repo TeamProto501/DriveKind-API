@@ -596,6 +596,7 @@ app.post("/rides/:ride_id/assign", validateJWT, async (req, res) => {
         driver_user_id: driver_user_id,
         vehicle_id: vehicle?.vehicle_id || null,
         status: "Assigned",
+        driver_assigned_by: req.user.id,   // dispatcher who clicked "Assign"
       },
       req.userToken
     );
@@ -1930,23 +1931,23 @@ app.post("/rides/:rideId/send-request", validateJWT, async (req, res) => {
       return res.status(400).json({ error: "Selected user is not a driver" });
     }
 
-    // ✅ Create/refresh pending request record and track who sent it
-    const { error: reqUpsertError } = await supabaseAdmin
-      .from("ride_requests")
-      .upsert(
-        [
-          {
-            ride_id: rideId,
-            org_id: profile.org_id,
-            driver_id: driver_user_id,
-            denied: false,
-            sent_by: req.user.id, // 👈 NEW FIELD
-          },
-        ],
+  // Only create/refresh the pending request record
+  const { error: reqUpsertError } = await supabaseAdmin
+    .from("ride_requests")
+    .upsert(
+      [
         {
-          onConflict: "ride_id,driver_id",
-        }
-      );
+          ride_id: rideId,
+          org_id: profile.org_id,
+          driver_id: driver_user_id,
+          denied: false,
+          sent_by: req.user.id,       // ✅ dispatcher who clicked "Send request"
+        },
+      ],
+      {
+        onConflict: "ride_id,driver_id",
+      }
+    );
 
     if (reqUpsertError) {
       console.error("ride_requests upsert error:", reqUpsertError);
@@ -1995,7 +1996,7 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
     // Look up request WITHOUT org filter (older rows may have null org_id)
     const { data: requestRow, error: reqErr } = await supabaseAdmin
       .from("ride_requests")
-      .select("ride_id, driver_id, denied, org_id")
+      .select("ride_id, driver_id, denied, org_id, sent_by")
       .eq("ride_id", rideId)
       .eq("driver_id", driverId)
       .maybeSingle();
@@ -2045,13 +2046,16 @@ app.post("/rides/:rideId/accept", validateJWT, async (req, res) => {
       assignedVehicleId = vehicle.vehicle_id;
     }
 
-    // Assign driver, set ride to Scheduled, and save assigned_vehicle
-    const updateData = {
+    // Figure out who assigned the driver (dispatcher who sent the request)
+    const assignedBy = requestRow.sent_by ?? null;
+
+    // Assign driver, set ride to Scheduled, and save assigned_vehicle + driver_assigned_by
+    const updateData: any = {
       driver_user_id: driverId,
       status: "Scheduled",
+      driver_assigned_by: assignedBy,   // ✅ copy from sent_by
     };
-    
-    // Only include assigned_vehicle if vehicle_id was provided
+
     if (assignedVehicleId) {
       updateData.assigned_vehicle = assignedVehicleId;
     }
