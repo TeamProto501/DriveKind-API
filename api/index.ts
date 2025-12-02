@@ -1930,12 +1930,23 @@ app.post("/rides/:rideId/send-request", validateJWT, async (req, res) => {
       return res.status(400).json({ error: "Selected user is not a driver" });
     }
 
-    // Only create/refresh the pending request record
+    // ✅ Create/refresh pending request record and track who sent it
     const { error: reqUpsertError } = await supabaseAdmin
       .from("ride_requests")
-      .upsert([{ ride_id: rideId, org_id: profile.org_id, driver_id: driver_user_id, denied: false }], {
-        onConflict: "ride_id,driver_id",
-      });
+      .upsert(
+        [
+          {
+            ride_id: rideId,
+            org_id: profile.org_id,
+            driver_id: driver_user_id,
+            denied: false,
+            sent_by: req.user.id, // 👈 NEW FIELD
+          },
+        ],
+        {
+          onConflict: "ride_id,driver_id",
+        }
+      );
 
     if (reqUpsertError) {
       console.error("ride_requests upsert error:", reqUpsertError);
